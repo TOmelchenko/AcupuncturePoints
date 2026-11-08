@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="t">
+  <title id="t">Back of the right hand with point LI4 marked between thumb and index finger</title>
+  <rect width="240" height="240" fill="#f7f4ef"/>
+  <path d="M70 220 L70 130 Q60 110 40 95 Q30 85 40 78 Q52 72 68 88 L88 108 L88 40 Q88 28 100 28 Q112 28 112 40 L112 100 L112 30 Q112 18 124 18 Q136 18 136 30 L136 100 L136 38 Q136 26 148 26 Q160 26 160 38 L160 106 L160 58 Q160 46 172 46 Q184 46 184 58 L184 150 Q184 190 160 220 Z"
+        fill="#f1d9c4" stroke="#7a5c48" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="92" cy="118" r="9" fill="#c2410c" stroke="#fff" stroke-width="3"/>
+  <text x="104" y="150" font-family="system-ui, sans-serif" font-size="16" fill="#7a2d0c">LI4</text>
+</svg>

@@ -1,5 +1,5 @@
 .PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend security audit-backend audit-frontend secrets \
-	supabase-start supabase-stop db-setup db-reset
+	supabase-start supabase-stop db-setup db-reset db-seed
 
 SUPABASE = npx -y supabase@3.0.0
 # Local Supabase database unless DATABASE_URL is set (for example in .env)
@@ -67,3 +67,15 @@ db-setup:
 db-reset:
 	$(SUPABASE) db reset --local
 	$(MAKE) db-setup
+
+# Local only: load invented development data and upload its images to Storage
+db-seed:
+	@case "$(DATABASE_URL)" in *127.0.0.1*|*localhost*) ;; *) echo "db-seed is for the local database only"; exit 1;; esac
+	PGOPTIONS=--client-min-messages=warning psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -q -f db/seed/seed.sql
+	@eval "$$($(SUPABASE) status -o env 2>/dev/null)"; \
+	for f in db/seed/images/*; do \
+		curl -sf -o /dev/null -X POST "$$API_URL/storage/v1/object/point-images/dev/$$(basename $$f)" \
+			-H "Authorization: Bearer $$SERVICE_ROLE_KEY" -H "x-upsert: true" \
+			-H "Content-Type: image/svg+xml" --data-binary @$$f \
+			&& echo "uploaded dev/$$(basename $$f)" || { echo "upload failed: $$f"; exit 1; }; \
+	done

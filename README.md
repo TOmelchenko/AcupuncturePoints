@@ -21,7 +21,7 @@ The same checks run in GitHub Actions on every pull request and push to `main`.
 
 The app uses Supabase (PostgreSQL + `pgvector`, Auth, Storage). Schema and policies are plain SQL scripts in `db/`, applied in file-name order — there is no migration framework.
 
-**Local:** `make supabase-start` runs the Supabase stack in Docker via the Supabase CLI (Studio on http://127.0.0.1:54323, test emails in Mailpit on http://127.0.0.1:54324). Then run `make db-setup` to apply the scripts. `make db-reset` recreates the local database and reapplies them.
+**Local:** `make supabase-start` runs the Supabase stack in Docker via the Supabase CLI (Studio on http://127.0.0.1:54323, test emails in Mailpit on http://127.0.0.1:54324). Then run `make db-setup` to apply the scripts. `make db-reset` recreates the local database and reapplies them. `make db-seed` loads invented development data (`db/seed/`: six symptom categories, seven points, two placeholder diagrams) — local only, never production.
 
 **Hosted:** set `DATABASE_URL` in `.env` to the project's connection string (Supabase dashboard → Connect) and run `make db-setup`. Scripts are idempotent and safe to re-run.
 

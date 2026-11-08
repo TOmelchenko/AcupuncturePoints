@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="t">
+  <title id="t">Inner forearm with point PC6 marked three finger-widths above the wrist crease</title>
+  <rect width="240" height="240" fill="#f7f4ef"/>
+  <path d="M85 230 L95 40 Q120 30 145 40 L155 230 Z" fill="#f1d9c4" stroke="#7a5c48" stroke-width="3"/>
+  <path d="M92 70 Q120 62 148 70" fill="none" stroke="#7a5c48" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="152" y="74" font-family="system-ui, sans-serif" font-size="12" fill="#7a5c48">wrist crease</text>
+  <line x1="113" y1="80" x2="111" y2="225" stroke="#c9a88f" stroke-width="2"/>
+  <line x1="127" y1="80" x2="129" y2="225" stroke="#c9a88f" stroke-width="2"/>
+  <circle cx="120" cy="118" r="9" fill="#c2410c" stroke="#fff" stroke-width="3"/>
+  <text x="60" y="123" font-family="system-ui, sans-serif" font-size="16" fill="#7a2d0c">PC6</text>
+</svg>
