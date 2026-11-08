@@ -6,6 +6,7 @@ Instructions for coding agents working in this repository.
 
 - Product requirements: `_docs/specification.md`. It is the source of truth; ask before deviating from it.
 - Working process: `_docs/process.md`.
+- Roles: `_docs/roles/` — `developer.md` implements an issue, `reviewer.md` reviews the change, `qa.md` verifies acceptance criteria before closing. Follow the file for the role you are asked to play.
 - Tasks are GitHub issues in `TOmelchenko/AcupuncturePoints`. Work on one issue at a time; read its goal and acceptance criteria before starting and again before closing.
 
 ## Stack
