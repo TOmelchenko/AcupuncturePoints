@@ -1,10 +1,14 @@
 import uuid
 from typing import Annotated
 
+import psycopg
 from fastapi import APIRouter, Depends
 
+from app.ai import AI, get_ai
 from app.auth import CurrentUser, get_current_user
+from app.db import get_db
 from app.errors import ApiError, error_responses
+from app.recommender import Recommender
 from app.schemas import (
     ClarificationRequest,
     FeedbackRequest,
@@ -16,6 +20,8 @@ from app.schemas import (
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 
 User = Annotated[CurrentUser, Depends(get_current_user)]
+Db = Annotated[psycopg.Connection, Depends(get_db)]
+Ai = Annotated[AI, Depends(get_ai)]
 NOT_IMPLEMENTED = ApiError(501, "not_implemented", "This feature is not available yet.")
 
 
@@ -27,21 +33,24 @@ NOT_IMPLEMENTED = ApiError(501, "not_implemented", "This feature is not availabl
     "Technical or AI failures return 502 `recommendation_failed` with `retryable: true`.",
     responses=error_responses(401, 422, 502),
 )
-def create_recommendation(body: RecommendationRequest, user: User) -> RecommendationResponse:
-    raise NOT_IMPLEMENTED
+def create_recommendation(
+    body: RecommendationRequest, user: User, db: Db, ai: Ai
+) -> RecommendationResponse:
+    return Recommender(db, ai).start(user.id, body.symptom)
 
 
 @router.post(
     "/{attempt_id}/clarification",
     response_model=RecommendationResponse,
     summary="Answer a clarifying question",
-    description="Continues an attempt that returned `clarification_needed`.",
+    description="Continues an attempt that returned `clarification_needed` (or failed after "
+    "one, to retry). A weak match after clarification returns `no_match`.",
     responses=error_responses(401, 404, 422, 502),
 )
 def answer_clarification(
-    attempt_id: uuid.UUID, body: ClarificationRequest, user: User
+    attempt_id: uuid.UUID, body: ClarificationRequest, user: User, db: Db, ai: Ai
 ) -> RecommendationResponse:
-    raise NOT_IMPLEMENTED
+    return Recommender(db, ai).clarify(user.id, attempt_id, body.answer)
 
 
 @router.post(

@@ -128,8 +128,10 @@ class FakeAI:
 def get_ai() -> AI:
     provider = os.environ.get("AI_PROVIDER", "bedrock")
     if provider == "fake":
-        log.warning("AI_PROVIDER=fake: using offline fake AI responses")
-        return FakeAI()
+        from app.demo_ai import demo_ai
+
+        log.warning("AI_PROVIDER=fake: using offline demo AI responses")
+        return demo_ai()
     if provider == "bedrock":
         return BedrockAI()
     raise ValueError(f"Unknown AI_PROVIDER: {provider}")
