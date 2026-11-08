@@ -66,7 +66,11 @@ def get(client: TestClient, auth: str | None) -> Any:
 def assert_unauthorized(response: Any) -> None:
     assert response.status_code == 401
     assert response.json() == {
-        "error": {"code": "unauthorized", "message": "Please sign in to continue."}
+        "error": {
+            "code": "unauthorized",
+            "message": "Please sign in to continue.",
+            "retryable": False,
+        }
     }
 
 
