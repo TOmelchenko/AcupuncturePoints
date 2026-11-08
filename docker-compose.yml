@@ -2,6 +2,13 @@ services:
   backend:
     build: ./backend
     env_file: .env
+    environment:
+      # Inside the container, local Supabase is reached via the host.
+      # Set COMPOSE_SUPABASE_URL / COMPOSE_DATABASE_URL in .env to use a hosted project.
+      SUPABASE_URL: ${COMPOSE_SUPABASE_URL:-http://host.docker.internal:54321}
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
 
