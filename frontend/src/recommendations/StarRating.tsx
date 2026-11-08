@@ -44,7 +44,7 @@ export function StarRating({ attemptId, pointId, pointName }: Props) {
                 aria-hidden="true"
                 className={cn(
                   'block rounded px-0.5 text-xl leading-none transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
-                  n <= shown ? 'text-primary' : 'text-border dark:text-muted-foreground/50',
+                  n <= shown ? 'text-primary' : 'text-border',
                 )}
               >
                 ★
