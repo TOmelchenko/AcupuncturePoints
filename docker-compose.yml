@@ -7,6 +7,8 @@ services:
       # Set COMPOSE_SUPABASE_URL / COMPOSE_DATABASE_URL in .env to use a hosted project.
       SUPABASE_URL: ${COMPOSE_SUPABASE_URL:-http://host.docker.internal:54321}
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
+      # Browsers load Storage images from the URL in .env, not the container-internal one.
+      SUPABASE_PUBLIC_URL: ${SUPABASE_URL:-http://127.0.0.1:54321}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
