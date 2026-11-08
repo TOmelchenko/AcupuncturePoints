@@ -50,3 +50,22 @@ jobs:
         run: docker build -t acupressure-backend backend
       - name: Build frontend image
         run: docker build --target prod -t acupressure-frontend frontend
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history for secret detection
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Python dependency audit (pip-audit)
+        run: make audit-backend
+      - name: npm dependency audit (high and critical)
+        run: make audit-frontend
+      - name: Secret detection (gitleaks)
+        run: make secrets

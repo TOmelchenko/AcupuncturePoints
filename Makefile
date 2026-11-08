@@ -1,4 +1,4 @@
-.PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend
+.PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend security audit-backend audit-frontend secrets
 
 install:
 	cd backend && uv sync
@@ -32,3 +32,16 @@ lint-backend:
 
 lint-frontend:
 	cd frontend && npm run lint
+
+# Dependency vulnerability scanning and secret detection (same checks as CI)
+security: audit-backend audit-frontend secrets
+
+audit-backend:
+	cd backend && req=$$(mktemp) && uv export --frozen --no-emit-project --format requirements-txt -q -o $$req \
+		&& uvx pip-audit --disable-pip -r $$req; status=$$?; rm -f $$req; exit $$status
+
+audit-frontend:
+	cd frontend && npm audit --audit-level=high
+
+secrets:
+	docker run --rm -v "$$PWD":/repo ghcr.io/gitleaks/gitleaks:v8.30.0 git /repo
