@@ -1,4 +1,4 @@
-.PHONY: install env up down logs test test-backend test-frontend
+.PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend
 
 install:
 	cd backend && uv sync
@@ -24,3 +24,11 @@ test-backend:
 
 test-frontend:
 	cd frontend && npm test
+
+lint: lint-backend lint-frontend
+
+lint-backend:
+	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app tests
+
+lint-frontend:
+	cd frontend && npm run lint
