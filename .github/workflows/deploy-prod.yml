@@ -30,18 +30,30 @@ jobs:
       - name: Pick and verify the commit
         id: pick
         run: |
+          # A development run counts only if its "Deploy backend" step actually ran and
+          # succeeded (runs before deployment was configured skip that step).
+          deployed_to_dev() {
+            for run in $(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --status success \
+                --commit "$1" --json databaseId -q '.[].databaseId'); do
+              step=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs" \
+                -q '.jobs[].steps[] | select(.name == "Deploy backend") | .conclusion')
+              [ "$step" = "success" ] && return 0
+            done
+            return 1
+          }
+
           commit="${{ inputs.commit }}"
           if [ -z "$commit" ]; then
-            commit=$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --status success \
-              --limit 1 --json headSha -q '.[0].headSha')
+            for sha in $(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --status success \
+                --limit 20 --json headSha -q '.[].headSha'); do
+              if deployed_to_dev "$sha"; then commit="$sha"; break; fi
+            done
           fi
           [ -n "$commit" ] || { echo "::error::No successful development deployment found"; exit 1; }
           ci=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$commit" --status success \
             --json databaseId -q 'length')
-          dev=$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --commit "$commit" --status success \
-            --json databaseId -q 'length')
           [ "$ci" -gt 0 ] || { echo "::error::CI has not passed for $commit"; exit 1; }
-          [ "$dev" -gt 0 ] || { echo "::error::$commit has not been deployed to development"; exit 1; }
+          deployed_to_dev "$commit" || { echo "::error::$commit has not been deployed to development"; exit 1; }
           echo "Deploying $commit to production"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
