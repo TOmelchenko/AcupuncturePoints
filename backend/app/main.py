@@ -1,7 +1,11 @@
+import os
+
 from fastapi import FastAPI
 
-from app.errors import EXCEPTION_HANDLERS
+from app.errors import EXCEPTION_HANDLERS, configure_logging
 from app.routes import account, recommendations
+
+configure_logging(os.environ.get("LOG_LEVEL", "INFO"))
 
 app = FastAPI(
     title="Acupressure Recommendation API",

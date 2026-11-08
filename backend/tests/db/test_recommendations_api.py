@@ -104,7 +104,7 @@ def env() -> Iterator[Env]:
     )
     conn.commit()
 
-    state = Env(client=TestClient(app), conn=conn, user_id=users[0])
+    state = Env(client=TestClient(app, raise_server_exceptions=False), conn=conn, user_id=users[0])
 
     def queued(items: list[Any]) -> Callable[[str], Any]:
         return lambda prompt: items.pop(0)
@@ -269,3 +269,20 @@ def test_symptom_text_is_not_logged(env: Env, caplog: pytest.LogCaptureFixture) 
     env.post(symptom=SYMPTOM)
     assert "failed: InvalidRecommendation" in caplog.text
     assert "dull ache" not in caplog.text
+
+
+def test_unexpected_error_is_generic_and_attempt_marked_failed(env: Env) -> None:
+    env.interpret.append(RuntimeError("unexpected bug"))
+
+    response = env.post(symptom=SYMPTOM)
+
+    assert response.status_code == 500
+    assert response.json()["error"] == {
+        "code": "internal_error",
+        "message": "Something went wrong. Please try again.",
+        "retryable": True,
+    }
+    row = env.conn.execute(
+        "select outcome from recommendation_attempts where user_id = %s", (env.user_id,)
+    ).fetchone()
+    assert row == ("failed",)

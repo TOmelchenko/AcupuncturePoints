@@ -76,3 +76,9 @@ Automated tests never call AWS: they use a programmable `FakeAI`. Set `AI_PROVID
 ```sh
 cd backend && RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
 ```
+
+## Errors and logging
+
+Every API error uses one shape: `{"error": {"code": "...", "message": "...", "retryable": true|false}}`. Messages are generic and safe to show; responses never include stack traces, provider errors, prompts or request ids. AI or technical failures during a recommendation return `502 recommendation_failed` with `retryable: true`, and the attempt is stored with outcome `failed`.
+
+Logs (level from `LOG_LEVEL`, default `INFO`) record attempt ids, outcomes and error classes. Symptom text is never logged, and unexpected exceptions are logged with their class and stack frames but not their message, since messages can echo stored values.
