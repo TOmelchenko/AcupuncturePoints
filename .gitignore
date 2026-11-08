@@ -17,3 +17,7 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Ingestion working files (source documents and outputs stay local)
+ingestion/out/
+ingestion/sources/

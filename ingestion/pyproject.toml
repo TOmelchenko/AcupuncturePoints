@@ -1,0 +1,36 @@
+[project]
+name = "ingestion"
+version = "0.1.0"
+description = "Knowledge ingestion pipeline for the Acupressure Recommendation App"
+requires-python = ">=3.12"
+dependencies = [
+    "pillow>=13.0.0",
+    "pypdf>=7.0.0",
+    "pypdfium2>=5.15.1",
+    "pytesseract>=0.3.13",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+
+[dependency-groups]
+dev = [
+    "fpdf2>=2.9.0",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.4",
+]
+
+[[tool.mypy.overrides]]
+module = ["pypdfium2", "pytesseract"]
+ignore_missing_imports = true

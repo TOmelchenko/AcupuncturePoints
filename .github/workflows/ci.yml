@@ -52,6 +52,24 @@ jobs:
         env:
           REQUIRE_DB: "1"
 
+  ingestion:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ingestion
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Install Tesseract OCR
+        run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy ingestion tests
+      - run: uv run pytest
+
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -74,7 +92,7 @@ jobs:
         with:
           node-version: 22
       - name: Python dependency audit (pip-audit)
-        run: make audit-backend
+        run: make audit-backend audit-ingestion
       - name: npm dependency audit (high and critical)
         run: make audit-frontend
       - name: Secret detection (gitleaks)

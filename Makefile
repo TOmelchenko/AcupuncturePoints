@@ -1,4 +1,5 @@
-.PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend security audit-backend audit-frontend secrets \
+.PHONY: install env up down logs test test-backend test-frontend test-ingestion lint lint-backend lint-frontend lint-ingestion \
+	security audit-backend audit-frontend audit-ingestion pip-audit secrets \
 	supabase-start supabase-stop db-setup db-reset db-seed
 
 SUPABASE = npx -y supabase@3.0.0
@@ -9,6 +10,7 @@ DATABASE_URL ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
 install:
 	cd backend && uv sync
 	cd frontend && npm ci
+	cd ingestion && uv sync
 
 # Create .env from the template on first run
 env:
@@ -23,7 +25,7 @@ down:
 logs:
 	docker compose logs -f
 
-test: test-backend test-frontend
+test: test-backend test-frontend test-ingestion
 
 test-backend:
 	cd backend && uv run pytest
@@ -31,7 +33,10 @@ test-backend:
 test-frontend:
 	cd frontend && npm test
 
-lint: lint-backend lint-frontend
+test-ingestion:
+	cd ingestion && uv run pytest
+
+lint: lint-backend lint-frontend lint-ingestion
 
 lint-backend:
 	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app tests
@@ -39,11 +44,20 @@ lint-backend:
 lint-frontend:
 	cd frontend && npm run lint
 
+lint-ingestion:
+	cd ingestion && uv run ruff check . && uv run ruff format --check . && uv run mypy ingestion tests
+
 # Dependency vulnerability scanning and secret detection (same checks as CI)
-security: audit-backend audit-frontend secrets
+security: audit-backend audit-frontend audit-ingestion secrets
 
 audit-backend:
-	cd backend && req=$$(mktemp) && uv export --frozen --no-emit-project --format requirements-txt -q -o $$req \
+	$(MAKE) pip-audit DIR=backend
+
+audit-ingestion:
+	$(MAKE) pip-audit DIR=ingestion
+
+pip-audit:
+	cd $(DIR) && req=$$(mktemp) && uv export --frozen --no-emit-project --format requirements-txt -q -o $$req \
 		&& uvx pip-audit --disable-pip -r $$req; status=$$?; rm -f $$req; exit $$status
 
 audit-frontend:

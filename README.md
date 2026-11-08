@@ -26,3 +26,21 @@ The app uses Supabase (PostgreSQL + `pgvector`, Auth, Storage). Schema and polic
 **Hosted:** set `DATABASE_URL` in `.env` to the project's connection string (Supabase dashboard → Connect) and run `make db-setup`. Scripts are idempotent and safe to re-run.
 
 Database tests in `backend/tests/db/` run against `DATABASE_URL` and are skipped if it is unreachable (CI sets `REQUIRE_DB=1` so they fail instead).
+
+## Knowledge ingestion
+
+`ingestion/` is a Python pipeline that turns curated source documents into the knowledge base.
+
+**Step 1 — extract text.** List local source files (PDF, `.txt`, `.md`) in a JSON manifest with their metadata, then run:
+
+```sh
+cd ingestion
+uv run python -m ingestion.extract sources/manifest.json -o out/pages.jsonl
+```
+
+```json
+{"sources": [{"file": "guide.pdf", "title": "Guide title", "language": "en",
+              "author": "Author", "url": "https://...", "license": "CC BY 4.0"}]}
+```
+
+Each output line holds one page's cleaned text, its page number and the source metadata. Pages without extractable text are OCR'd with Tesseract (`brew install tesseract` / `apt-get install tesseract-ocr`, plus language packs for non-English sources). `ingestion/sources/` and `ingestion/out/` are git-ignored.
