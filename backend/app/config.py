@@ -10,6 +10,7 @@ class Settings:
     supabase_url: str  # how the backend reaches Supabase
     supabase_public_url: str  # how browsers reach Supabase (e.g. for Storage images)
     database_url: str
+    supabase_service_role_key: str  # backend only: used to delete Auth users
 
 
 @lru_cache
@@ -21,4 +22,5 @@ def get_settings() -> Settings:
         database_url=os.environ.get(
             "DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
         ),
+        supabase_service_role_key=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
     )

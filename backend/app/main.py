@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.errors import EXCEPTION_HANDLERS
-from app.routes import recommendations
+from app.routes import account, recommendations
 
 app = FastAPI(
     title="Acupressure Recommendation API",
@@ -11,6 +11,7 @@ app = FastAPI(
 for exception_class, handler in EXCEPTION_HANDLERS.items():
     app.add_exception_handler(exception_class, handler)
 app.include_router(recommendations.router)
+app.include_router(account.router)
 
 
 @app.get("/api/health", tags=["health"])
