@@ -1,4 +1,10 @@
-.PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend security audit-backend audit-frontend secrets
+.PHONY: install env up down logs test test-backend test-frontend lint lint-backend lint-frontend security audit-backend audit-frontend secrets \
+	supabase-start supabase-stop db-setup db-reset
+
+SUPABASE = npx -y supabase@3.0.0
+# Local Supabase database unless DATABASE_URL is set (for example in .env)
+-include .env
+DATABASE_URL ?= postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 install:
 	cd backend && uv sync
@@ -45,3 +51,19 @@ audit-frontend:
 
 secrets:
 	docker run --rm -v "$$PWD":/repo ghcr.io/gitleaks/gitleaks:v8.30.0 git /repo
+
+# Local Supabase (Postgres + pgvector, Auth, Storage, Mailpit) via the Supabase CLI
+supabase-start:
+	$(SUPABASE) start
+
+supabase-stop:
+	$(SUPABASE) stop
+
+# Apply SQL setup scripts in file-name order (idempotent)
+db-setup:
+	for f in db/[0-9]*.sql; do PGOPTIONS=--client-min-messages=warning psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -q -f $$f || exit 1; done
+
+# Local only: recreate the local Supabase database, then apply the scripts
+db-reset:
+	$(SUPABASE) db reset --local
+	$(MAKE) db-setup

@@ -36,11 +36,21 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: "3.12"
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 3.0.0
+      - name: Start local Supabase and apply SQL scripts
+        working-directory: .
+        run: |
+          supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
+          make db-setup
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app tests
       - run: uv run pytest
+        env:
+          REQUIRE_DB: "1"
 
   docker:
     runs-on: ubuntu-latest

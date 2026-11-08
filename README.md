@@ -12,6 +12,17 @@ A responsive web app that suggests acupressure points for a described symptom, u
 | `make up` / `make down` / `make logs` | Start, stop and follow the Docker Compose environment (frontend on http://localhost:5173, backend on http://localhost:8000) |
 | `make test` | Run backend and frontend tests |
 | `make lint` | Run ruff, mypy and ESLint |
+| `make supabase-start` / `make db-setup` | Start local Supabase and apply the SQL scripts in `db/` |
 | `make security` | Scan dependencies (pip-audit, npm audit) and detect committed secrets (gitleaks, via Docker) |
 
 The same checks run in GitHub Actions on every pull request and push to `main`.
+
+## Database
+
+The app uses Supabase (PostgreSQL + `pgvector`, Auth, Storage). Schema and policies are plain SQL scripts in `db/`, applied in file-name order — there is no migration framework.
+
+**Local:** `make supabase-start` runs the Supabase stack in Docker via the Supabase CLI (Studio on http://127.0.0.1:54323, test emails in Mailpit on http://127.0.0.1:54324). Then run `make db-setup` to apply the scripts. `make db-reset` recreates the local database and reapplies them.
+
+**Hosted:** set `DATABASE_URL` in `.env` to the project's connection string (Supabase dashboard → Connect) and run `make db-setup`. Scripts are idempotent and safe to re-run.
+
+Database tests in `backend/tests/db/` run against `DATABASE_URL` and are skipped if it is unreachable (CI sets `REQUIRE_DB=1` so they fail instead).
