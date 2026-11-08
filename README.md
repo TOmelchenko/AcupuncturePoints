@@ -200,7 +200,18 @@ The schema, RLS policies and storage bucket are plain SQL scripts in `db/`, appl
 
 ## Deployment
 
-Cloud deployment happens only after the complete application passes the local tests. The hosting setup, URLs and release process will be documented here once deployed.
+The MVP deploys to free tiers: **Supabase Free** for the database, Auth and Storage, and **Render** for the backend (Docker web service) and frontend (static site), in separate development and production environments. Amazon Bedrock runs Claude Haiku 4.5 in the deployed environments. All of this is defined in `render.yaml`.
+
+- **Development:** deploys automatically after CI passes on `main` (`.github/workflows/deploy-dev.yml`).
+- **Production:** deploys manually with approval, and only a commit already verified in development can go (`.github/workflows/deploy-prod.yml`).
+- **Safety:** a failed deploy never replaces the running version. Rollback means redeploying the last good commit.
+
+Setup steps, the release process and rollback are in [`_docs/deployment.md`](_docs/deployment.md).
+
+| Environment | URL |
+|---|---|
+| Development | *added after the first deployment* |
+| Production | *added after the first deployment* |
 
 ## AI-assisted development
 

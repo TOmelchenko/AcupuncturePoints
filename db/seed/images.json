@@ -1,0 +1,8 @@
+{
+  "images": [
+    {"point_id": "LI4", "file": "images/LI4.svg", "permitted": true,
+     "attribution": "Development placeholder diagram drawn for this project", "license": "Project-owned, free to use"},
+    {"point_id": "PC6", "file": "images/PC6.svg", "permitted": true,
+     "attribution": "Development placeholder diagram drawn for this project", "license": "Project-owned, free to use"}
+  ]
+}

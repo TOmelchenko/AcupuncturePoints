@@ -1,0 +1,68 @@
+name: Deploy to production
+
+# Manual production deployment. Only a commit that passed CI and was deployed to
+# development can go to production, and the `production` environment requires
+# approval. To roll back, run this workflow with the last known good commit.
+# Setup: _docs/deployment.md.
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit SHA to deploy (default: the latest successful development deployment)"
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.pick.outputs.commit }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Pick and verify the commit
+        id: pick
+        run: |
+          commit="${{ inputs.commit }}"
+          if [ -z "$commit" ]; then
+            commit=$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --status success \
+              --limit 1 --json headSha -q '.[0].headSha')
+          fi
+          [ -n "$commit" ] || { echo "::error::No successful development deployment found"; exit 1; }
+          ci=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$commit" --status success \
+            --json databaseId -q 'length')
+          dev=$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-dev.yml --commit "$commit" --status success \
+            --json databaseId -q 'length')
+          [ "$ci" -gt 0 ] || { echo "::error::CI has not passed for $commit"; exit 1; }
+          [ "$dev" -gt 0 ] || { echo "::error::$commit has not been deployed to development"; exit 1; }
+          echo "Deploying $commit to production"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: production  # configure required reviewers in Settings → Environments
+      url: ${{ vars.PROD_WEB_URL }}
+    env:
+      COMMIT: ${{ needs.verify.outputs.commit }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.COMMIT }}
+      - name: Apply database setup scripts (idempotent, additive)
+        run: make db-setup DATABASE_URL="${{ secrets.PROD_DATABASE_URL }}"
+      - name: Deploy backend
+        run: scripts/render-deploy.sh "${{ secrets.RENDER_PROD_API_SERVICE_ID }}" "$COMMIT"
+      - name: Deploy frontend
+        run: scripts/render-deploy.sh "${{ secrets.RENDER_PROD_WEB_SERVICE_ID }}" "$COMMIT"
+      - name: Smoke test
+        run: scripts/smoke-test.sh "${{ vars.PROD_API_URL }}" "${{ vars.PROD_WEB_URL }}"

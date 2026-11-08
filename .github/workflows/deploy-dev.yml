@@ -1,0 +1,53 @@
+name: Deploy to development
+
+# Continuous deployment: after CI passes on main, deploy that exact commit to the
+# development environment on Render. Setup: _docs/deployment.md.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: ${{ vars.DEV_WEB_URL }}
+    env:
+      COMMIT: ${{ github.event.workflow_run.head_sha }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+    steps:
+      - name: Check that deployment is configured
+        id: configured
+        run: |
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "::notice::Deployment secrets are not set yet (see _docs/deployment.md); skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          ref: ${{ env.COMMIT }}
+      - name: Apply database setup scripts (idempotent)
+        if: steps.configured.outputs.ready == 'true'
+        run: make db-setup DATABASE_URL="${{ secrets.DEV_DATABASE_URL }}"
+      - name: Deploy backend
+        if: steps.configured.outputs.ready == 'true'
+        run: scripts/render-deploy.sh "${{ secrets.RENDER_DEV_API_SERVICE_ID }}" "$COMMIT"
+      - name: Deploy frontend
+        if: steps.configured.outputs.ready == 'true'
+        run: scripts/render-deploy.sh "${{ secrets.RENDER_DEV_WEB_SERVICE_ID }}" "$COMMIT"
+      - name: Smoke test
+        if: steps.configured.outputs.ready == 'true'
+        run: scripts/smoke-test.sh "${{ vars.DEV_API_URL }}" "${{ vars.DEV_WEB_URL }}"

@@ -1,0 +1,122 @@
+# Render Blueprint: development and production environments on Render's free plan.
+#
+# Each environment has a FastAPI backend (Docker web service) and a static frontend.
+# Deploys are triggered by GitHub Actions, not by Render: development after CI
+# passes on main (.github/workflows/deploy-dev.yml), production manually with
+# approval (.github/workflows/deploy-prod.yml). Values marked `sync: false` are
+# secrets you enter in the Render dashboard; see _docs/deployment.md.
+
+services:
+  # ---------------------------------------------------------------- development
+  - type: web
+    name: acupressure-api-dev
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: AI_PROVIDER
+        value: bedrock
+      - key: BEDROCK_TEXT_MODEL_ID
+        value: anthropic.claude-haiku-4-5
+      - key: BEDROCK_EMBEDDING_MODEL_ID
+        value: amazon.titan-embed-text-v2:0
+      - key: FRONTEND_HOST
+        fromService:
+          type: web
+          name: acupressure-web-dev
+          property: host
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+  - type: web
+    name: acupressure-web-dev
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && VITE_API_BASE_URL=https://$API_HOST npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: "off"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: API_HOST
+        fromService:
+          type: web
+          name: acupressure-api-dev
+          property: host
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+
+  # ----------------------------------------------------------------- production
+  - type: web
+    name: acupressure-api-prod
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: AI_PROVIDER
+        value: bedrock
+      - key: BEDROCK_TEXT_MODEL_ID
+        value: anthropic.claude-haiku-4-5
+      - key: BEDROCK_EMBEDDING_MODEL_ID
+        value: amazon.titan-embed-text-v2:0
+      - key: FRONTEND_HOST
+        fromService:
+          type: web
+          name: acupressure-web-prod
+          property: host
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+  - type: web
+    name: acupressure-web-prod
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && VITE_API_BASE_URL=https://$API_HOST npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: "off"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: API_HOST
+        fromService:
+          type: web
+          name: acupressure-api-prod
+          property: host
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
