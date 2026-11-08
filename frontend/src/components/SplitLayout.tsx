@@ -14,7 +14,7 @@ interface Props {
 /** The two-column pressure·point layout: calm panel on the left, content on the right. */
 export function SplitLayout({ aside, nav, children }: Props) {
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground">
+    <div className="relative min-h-screen bg-background font-sans text-foreground">
       <div className="grid min-h-screen lg:grid-cols-[5fr_7fr]">
         <aside className="relative flex flex-col justify-between gap-8 bg-calm p-6 sm:p-8 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:p-12">
           <Brand />
@@ -31,7 +31,12 @@ export function SplitLayout({ aside, nav, children }: Props) {
           <Disclaimer />
         </aside>
         <main className="p-6 sm:p-8 lg:p-12">
-          {nav && <nav className="mb-8 flex justify-end gap-2">{nav}</nav>}
+          {/* Top-right on small screens (beside the brand), top of the content column on large ones. */}
+          {nav && (
+            <nav className="absolute right-3 top-5 flex gap-1 sm:right-5 sm:top-7 lg:static lg:mb-8 lg:justify-end lg:gap-2">
+              {nav}
+            </nav>
+          )}
           {children}
         </main>
       </div>

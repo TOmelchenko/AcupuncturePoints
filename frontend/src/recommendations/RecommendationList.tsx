@@ -1,4 +1,5 @@
 import type { RecommendedPoint } from '@/lib/types'
+import { PointCard } from './PointCard'
 
 interface Props {
   attemptId: string
@@ -7,10 +8,10 @@ interface Props {
 
 export function RecommendationList({ points }: Props) {
   return (
-    <ol className="mt-8 space-y-5">
-      {points.map((point) => (
-        <li key={point.point_id}>{point.name}</li>
+    <div className="mt-8 space-y-5">
+      {points.map((point, index) => (
+        <PointCard key={point.point_id} point={point} index={index} />
       ))}
-    </ol>
+    </div>
   )
 }
