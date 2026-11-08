@@ -52,3 +52,17 @@ uv run python -m ingestion.load out/pages.jsonl
 ```
 
 Non-English pages are translated into English with Claude on Amazon Bedrock (the source keeps its original language and page references). Text is split into ~1,000-character overlapping chunks, embedded with Amazon Titan Text Embeddings V2 (1,024 dimensions) and stored in `knowledge_chunks`. A chunk that mentions exactly one known point code (e.g. `LI4`) is linked to that point. Re-running a source replaces its chunks. Configuration comes from `DATABASE_URL`, `AWS_REGION`, `BEDROCK_TEXT_MODEL_ID` and `BEDROCK_EMBEDDING_MODEL_ID`; set `AI_PROVIDER=fake` to run offline with deterministic fake embeddings.
+
+**Step 3 — point images.** Location images are catalogued by hand in a JSON manifest, each with an explicit usage decision:
+
+```json
+{"images": [{"point_id": "LI4", "file": "images/li4.png", "permitted": true,
+             "attribution": "Figure 3, A. Author", "license": "CC BY 4.0",
+             "source_title": "Guide title", "page": 12}]}
+```
+
+```sh
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... uv run python -m ingestion.images sources/images.json
+```
+
+All entries are validated first (known point, attribution and licence present, PNG/JPEG/WebP/SVG file exists). Permitted images are uploaded to the public `point-images` bucket as `points/<point_id>.<ext>` and linked with their attribution, source and page. Only use images whose licence allows it; entries with `"permitted": false` clear any existing image so the app shows the text location instead.
