@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Knowledge ingestion pipeline for the Acupressure Recommendation App"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic[bedrock]>=2.6.0",
+    "boto3>=1.43.126",
     "pillow>=13.0.0",
+    "psycopg[binary]>=3.3.8",
     "pypdf>=7.0.0",
     "pypdfium2>=5.15.1",
     "pytesseract>=0.3.13",
@@ -32,5 +35,5 @@ dev = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["pypdfium2", "pytesseract"]
+module = ["pypdfium2", "pytesseract", "boto3"]
 ignore_missing_imports = true

@@ -44,3 +44,11 @@ uv run python -m ingestion.extract sources/manifest.json -o out/pages.jsonl
 ```
 
 Each output line holds one page's cleaned text, its page number and the source metadata. Pages without extractable text are OCR'd with Tesseract (`brew install tesseract` / `apt-get install tesseract-ocr`, plus language packs for non-English sources). `ingestion/sources/` and `ingestion/out/` are git-ignored.
+
+**Step 2 — translate, chunk, embed and store.**
+
+```sh
+uv run python -m ingestion.load out/pages.jsonl
+```
+
+Non-English pages are translated into English with Claude on Amazon Bedrock (the source keeps its original language and page references). Text is split into ~1,000-character overlapping chunks, embedded with Amazon Titan Text Embeddings V2 (1,024 dimensions) and stored in `knowledge_chunks`. A chunk that mentions exactly one known point code (e.g. `LI4`) is linked to that point. Re-running a source replaces its chunks. Configuration comes from `DATABASE_URL`, `AWS_REGION`, `BEDROCK_TEXT_MODEL_ID` and `BEDROCK_EMBEDDING_MODEL_ID`; set `AI_PROVIDER=fake` to run offline with deterministic fake embeddings.

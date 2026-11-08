@@ -64,11 +64,21 @@ jobs:
           python-version: "3.12"
       - name: Install Tesseract OCR
         run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 3.0.0
+      - name: Start local Supabase and apply SQL scripts
+        working-directory: .
+        run: |
+          supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit,gotrue,kong,postgrest,storage-api
+          make db-setup
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy ingestion tests
       - run: uv run pytest
+        env:
+          REQUIRE_DB: "1"
 
   docker:
     runs-on: ubuntu-latest
