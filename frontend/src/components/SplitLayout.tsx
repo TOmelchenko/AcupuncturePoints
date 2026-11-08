@@ -2,11 +2,12 @@ import type { ReactNode } from 'react'
 import hand from '@/assets/hand-point.jpg'
 import { Brand } from './Brand'
 import { Disclaimer } from './Disclaimer'
+import { ThemeToggle } from './ThemeToggle'
 
 interface Props {
   /** Content for the calm left-hand panel, below the illustration. */
   aside: ReactNode
-  /** Optional navigation shown at the top of the main area. */
+  /** Optional navigation links shown at the top (the theme toggle is always there). */
   nav?: ReactNode
   children: ReactNode
 }
@@ -32,11 +33,10 @@ export function SplitLayout({ aside, nav, children }: Props) {
         </aside>
         <main className="p-6 sm:p-8 lg:p-12">
           {/* Top-right on small screens (beside the brand), top of the content column on large ones. */}
-          {nav && (
-            <nav className="absolute right-3 top-5 flex gap-1 sm:right-5 sm:top-7 lg:static lg:mb-8 lg:justify-end lg:gap-2">
-              {nav}
-            </nav>
-          )}
+          <nav className="absolute right-3 top-5 flex gap-1 sm:right-5 sm:top-7 lg:static lg:mb-8 lg:justify-end lg:gap-2">
+            {nav}
+            <ThemeToggle />
+          </nav>
           {children}
         </main>
       </div>
