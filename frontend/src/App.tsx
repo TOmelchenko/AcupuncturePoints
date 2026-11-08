@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
+import { AccountPage } from '@/pages/AccountPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -15,6 +16,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/account"
+        element={
+          <ProtectedRoute>
+            <AccountPage />
           </ProtectedRoute>
         }
       />
