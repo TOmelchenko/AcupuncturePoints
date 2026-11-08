@@ -1,6 +1,6 @@
 .PHONY: install env up down logs test test-backend test-frontend test-ingestion lint lint-backend lint-frontend lint-ingestion \
 	security audit-backend audit-frontend audit-ingestion pip-audit secrets \
-	supabase-start supabase-stop db-setup db-reset db-seed
+	supabase-start supabase-stop supabase-env db-setup db-reset db-seed
 
 SUPABASE = npx -y supabase@3.0.0
 # Local Supabase database unless DATABASE_URL is set (for example in .env)
@@ -72,6 +72,17 @@ supabase-start:
 
 supabase-stop:
 	$(SUPABASE) stop
+
+# Write the local Supabase URL and keys into .env (local development only)
+supabase-env: env
+	@eval "$$($(SUPABASE) status -o env 2>/dev/null)"; \
+	sed -i.bak \
+		-e "s|^SUPABASE_URL=.*|SUPABASE_URL=$$API_URL|" \
+		-e "s|^SUPABASE_SERVICE_ROLE_KEY=.*|SUPABASE_SERVICE_ROLE_KEY=$$SERVICE_ROLE_KEY|" \
+		-e "s|^VITE_SUPABASE_URL=.*|VITE_SUPABASE_URL=$$API_URL|" \
+		-e "s|^VITE_SUPABASE_ANON_KEY=.*|VITE_SUPABASE_ANON_KEY=$$ANON_KEY|" \
+		-e "s|^DATABASE_URL=.*|DATABASE_URL=$$DB_URL|" .env && rm -f .env.bak
+	@echo "Updated .env with local Supabase settings"
 
 # Apply SQL setup scripts in file-name order (idempotent)
 db-setup:
