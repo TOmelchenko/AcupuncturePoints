@@ -1,4 +1,4 @@
-.PHONY: install env up down logs test test-backend test-frontend test-ingestion lint lint-backend lint-frontend lint-ingestion \
+.PHONY: install env up down logs test test-backend test-frontend test-ingestion test-integration lint lint-backend lint-frontend lint-ingestion lint-integration \
 	security audit-backend audit-frontend audit-ingestion pip-audit secrets \
 	supabase-start supabase-stop supabase-env db-setup db-reset db-seed
 
@@ -11,6 +11,7 @@ install:
 	cd backend && uv sync
 	cd frontend && npm ci
 	cd ingestion && uv sync
+	cd tests/integration && uv sync
 
 # Create .env from the template on first run
 env:
@@ -36,7 +37,11 @@ test-frontend:
 test-ingestion:
 	cd ingestion && uv run pytest
 
-lint: lint-backend lint-frontend lint-ingestion
+# Running backend + local Supabase (seed data) + demo AI, over HTTP with real Auth tokens
+test-integration: db-setup db-seed
+	cd tests/integration && uv run pytest
+
+lint: lint-backend lint-frontend lint-ingestion lint-integration
 
 lint-backend:
 	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app tests
@@ -46,6 +51,9 @@ lint-frontend:
 
 lint-ingestion:
 	cd ingestion && uv run ruff check . && uv run ruff format --check . && uv run mypy ingestion tests
+
+lint-integration:
+	cd tests/integration && uv run ruff check . && uv run ruff format --check . && uv run mypy .
 
 # Dependency vulnerability scanning and secret detection (same checks as CI)
 security: audit-backend audit-frontend audit-ingestion secrets

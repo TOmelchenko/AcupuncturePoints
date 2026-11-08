@@ -81,6 +81,28 @@ jobs:
         env:
           REQUIRE_DB: "1"
 
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 3.0.0
+      - name: Start local Supabase
+        run: |
+          supabase start -x studio,imgproxy,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
+          supabase status -o env | grep -E '^(SERVICE_ROLE_KEY|ANON_KEY)=' | tr -d '"' | sed 's/^/SUPABASE_/' >> "$GITHUB_ENV"
+      - run: cd backend && uv sync --frozen
+      - run: cd tests/integration && uv sync --frozen
+      - run: make lint-integration
+      - run: make test-integration
+
   docker:
     runs-on: ubuntu-latest
     steps:

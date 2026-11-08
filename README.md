@@ -82,3 +82,14 @@ cd backend && RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
 Every API error uses one shape: `{"error": {"code": "...", "message": "...", "retryable": true|false}}`. Messages are generic and safe to show; responses never include stack traces, provider errors, prompts or request ids. AI or technical failures during a recommendation return `502 recommendation_failed` with `retryable: true`, and the attempt is stored with outcome `failed`.
 
 Logs (level from `LOG_LEVEL`, default `INFO`) record attempt ids, outcomes and error classes. Symptom text is never logged, and unexpected exceptions are logged with their class and stack frames but not their message, since messages can echo stored values.
+
+## Integration tests
+
+`tests/integration/` starts the real backend as a separate process against local Supabase (with the development seed data) and the offline demo AI, then exercises the API over HTTP with real Supabase Auth tokens: recommendation outcomes, an unknown point id from the model, feedback storage, user data isolation (also directly through Supabase's REST API, where RLS applies) and account deletion.
+
+```sh
+make supabase-start
+make test-integration   # applies db/ scripts and seed data first
+```
+
+The demo AI (`AI_PROVIDER=fake`, never for production) understands two markers for testing failure paths: a symptom containing `[demo:fail]` makes the AI call fail, and `[demo:invalid-id]` makes it return a point id that does not exist.
