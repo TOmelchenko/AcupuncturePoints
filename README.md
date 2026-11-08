@@ -1,105 +1,207 @@
-# Acupressure Recommendation App
+# pressure·point — Acupressure Recommendation App
 
-A responsive web app that suggests acupressure points for a described symptom, using curated knowledge and AI-assisted retrieval. See `_docs/specification.md` for requirements.
+A responsive web app that helps people explore acupressure points for a physical or mental/emotional symptom. The user describes the symptom in their own words. An AI-assisted workflow interprets it, retrieves curated knowledge, and returns three acupressure points with a location picture (or a text description), step-by-step instructions, and duration/pressure guidance where the curated source provides it. Users rate each point after trying it, and those ratings act as a secondary ranking signal.
 
-> General wellness information only — not a diagnosis or a substitute for professional medical care.
+Requirements live in [`_docs/specification.md`](_docs/specification.md). Work is tracked as [GitHub issues](https://github.com/TOmelchenko/AcupuncturePoints/issues).
 
-## Development commands
+> **Medical disclaimer.** This app provides general wellness information only. It does not diagnose, it is not an emergency or treatment service, and it does not replace professional medical care. Stop any technique that causes pain or discomfort, and seek professional advice if you are concerned about a symptom.
+
+## Known limitations
+
+- **General disclaimer only.** There is deliberately no automated safety screening or medical triage. The disclaimer does not make every suggestion safe for every person.
+- **Quality depends on the sources.** Recommendations are only as good as the curated material. The repository ships with *invented development data* (`db/seed/`), not a real knowledge base; the project owner selects the real sources.
+- **Grounding reduces but cannot remove errors.** Retrieval, schema validation and point-ID checks stop the model from inventing points, images, durations or pressure guidance. They cannot guarantee that every instruction is accurate or appropriate.
+- **No efficacy claims.** The app makes no claim that acupressure treats any condition.
+- **Sparse ratings early on.** Ratings only nudge the ranking (±0.05 relevance, at least 3 ratings), so recommendations stay driven by symptom relevance.
+- **Sensitive data.** Symptom descriptions may contain health information. They are visible only to their owner (RLS), never logged, and deleted with the account.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser["Frontend<br/>React + Vite"] -- "Supabase Auth<br/>(sign-up, sign-in, reset)" --> Auth["Supabase Auth"]
+  Browser -- "REST /api + access token" --> API["Backend<br/>FastAPI"]
+  API -- "verify JWT (JWKS)" --> Auth
+  API -- "SQL + pgvector" --> DB[("Supabase Postgres<br/>pgvector, RLS")]
+  API -- "embeddings + structured generation" --> Bedrock["Amazon Bedrock<br/>Claude, Titan Embeddings"]
+  Browser -- "point images" --> Storage["Supabase Storage"]
+  Ingest["Ingestion pipeline<br/>Python"] --> DB
+  Ingest --> Storage
+  Ingest --> Bedrock
+```
+
+How a recommendation request works (`backend/app/recommender.py`):
+
+1. **Store the attempt.** The backend verifies the Supabase access token and stores the attempt with the original symptom text.
+2. **Interpret.** Claude maps the symptom to predefined categories and search terms, or asks a clarifying question.
+3. **Retrieve.** Candidates come from two sources: points curated for the matched categories, and points linked to the most similar knowledge chunks found with a `pgvector` cosine search.
+4. **Rank.** Candidates are ordered by relevance, with past ratings as a bounded tie-breaker.
+5. **Choose.** Claude picks three of the candidates, grounded in the retrieved excerpts.
+6. **Validate.** The backend checks there are exactly three distinct IDs, all among the candidates and all present in the database. Everything the user sees comes from the curated database records.
+7. **Persist and return.** The outcome is stored (`recommended`, `clarification_needed`, `no_match` or `failed`) and returned.
+
+| Path | Contents |
+|---|---|
+| `frontend/` | React + TypeScript + Vite, Tailwind v4 + shadcn/ui (design from the pressure·point prototype), TanStack Query, React Hook Form + Zod, Vitest, Playwright (`e2e/`) |
+| `backend/` | FastAPI app (`app/`), pytest suite (`tests/`, database tests in `tests/db/`) |
+| `ingestion/` | Text extraction with OCR, translation, chunking, embeddings, image catalogue |
+| `db/` | Plain SQL setup scripts (schema, RLS, storage) and development seed data |
+| `tests/integration/` | Integration tests against a running backend and local Supabase |
+| `supabase/` | Local Supabase CLI configuration |
+| `_docs/` | Specification, process, roles, [AI-assisted workflow](_docs/ai-workflow.md) |
+
+The API is documented by FastAPI's OpenAPI: http://localhost:8000/docs (interactive) and `/openapi.json`.
+
+## Quick start (local)
+
+**Prerequisites:** Docker, Node.js 22, [uv](https://docs.astral.sh/uv/), `psql` (PostgreSQL client), and Tesseract if you run ingestion on scanned PDFs.
+
+```sh
+make install          # backend, frontend, ingestion and integration-test dependencies
+make supabase-start   # local Supabase in Docker (first run downloads images)
+make supabase-env     # create .env from .env.example and fill in the local Supabase keys
+make db-setup         # apply db/ scripts: schema, RLS policies, storage bucket
+make db-seed          # invented development data (local only)
+```
+
+Choose the AI provider in `.env`:
+- **Offline demo:** `AI_PROVIDER=fake` uses keyword-matching stand-in answers, with no AWS needed.
+- **Real AI:** `AI_PROVIDER=bedrock` uses AWS credentials and Bedrock model access in `AWS_REGION`.
+
+Then start the app:
+
+```sh
+make up               # backend on http://localhost:8000, frontend on http://localhost:5173
+```
+
+Open http://localhost:5173, create an account, and confirm it with the email caught by Mailpit at http://127.0.0.1:54324. Supabase Studio is at http://127.0.0.1:54323.
+
+Without Docker Compose you can also run the two apps directly: `cd backend && uv run uvicorn app.main:app --reload` and `cd frontend && npm run dev`.
+
+## Configuration
+
+All configuration comes from environment variables. Copy `.env.example` to `.env` (`make env` does this) and never commit `.env`. CI and CD credentials live in GitHub Actions Secrets.
+
+| Variable | Used by | Purpose |
+|---|---|---|
+| `SUPABASE_URL` | backend | Supabase project URL; access tokens are verified against its JWKS |
+| `SUPABASE_PUBLIC_URL` | backend | Browser-facing Supabase URL for Storage image links (defaults to `SUPABASE_URL`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | backend, ingestion | Privileged key for deleting Auth users and uploading images. **Backend only.** |
+| `DATABASE_URL` | backend, ingestion, `make db-*` | Postgres connection string (privileged; the backend scopes private data to the user) |
+| `AI_PROVIDER` | backend, ingestion | `bedrock` (default) or `fake` (offline demo; never production) |
+| `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | backend, ingestion | Bedrock access (or any standard AWS credential source) |
+| `BEDROCK_TEXT_MODEL_ID` | backend, ingestion | Claude model, default `anthropic.claude-opus-5-5` |
+| `BEDROCK_EMBEDDING_MODEL_ID` | backend, ingestion | Default `amazon.titan-embed-text-v2:0`; must match the `vector(1024)` column |
+| `LOG_LEVEL` | backend | Default `INFO` |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | frontend | Public values bundled into the browser app (RLS protects the data) |
+| `VITE_API_BASE_URL` | frontend | Backend URL; leave empty locally (Vite proxies `/api`) |
+| `COMPOSE_SUPABASE_URL`, `COMPOSE_DATABASE_URL` | Docker Compose | Override how the backend container reaches Supabase (defaults to the host's local Supabase) |
+
+## Commands
 
 | Command | What it does |
 |---|---|
-| `make install` | Install backend (uv) and frontend (npm) dependencies |
-| `make up` / `make down` / `make logs` | Start, stop and follow the Docker Compose environment (frontend on http://localhost:5173, backend on http://localhost:8000) |
-| `make test` | Run backend and frontend tests |
-| `make lint` | Run ruff, mypy and ESLint |
-| `make supabase-start` / `make db-setup` | Start local Supabase and apply the SQL scripts in `db/` |
-| `make security` | Scan dependencies (pip-audit, npm audit) and detect committed secrets (gitleaks, via Docker) |
+| `make install` | Install all dependencies |
+| `make up` / `make down` / `make logs` | Start, stop and follow the Docker Compose environment |
+| `make supabase-start` / `make supabase-stop` | Start or stop local Supabase |
+| `make supabase-env` | Write the local Supabase URL and keys into `.env` |
+| `make db-setup` | Apply the SQL scripts in `db/` (idempotent; works on hosted Supabase via `DATABASE_URL`) |
+| `make db-seed` / `make db-reset` | Load development data / recreate the local database (local only) |
+| `make test` | Backend, frontend and ingestion tests |
+| `make test-integration` | Integration tests (running backend + local Supabase) |
+| `make e2e` | Playwright browser tests |
+| `make lint` | ruff, mypy and ESLint (with TypeScript type-check in the build) |
+| `make security` | pip-audit, npm audit and gitleaks secret detection |
 
-The same checks run in GitHub Actions on every pull request and push to `main`.
+## Testing
+
+| Layer | Where | Notes |
+|---|---|---|
+| Backend unit and API tests | `backend/tests/` | Bedrock is always mocked (`FakeAI`). Database tests in `tests/db/` run against local Supabase and are skipped when it isn't running; CI sets `REQUIRE_DB=1` so they fail instead. |
+| Frontend component tests | `frontend/src/**/*.test.tsx` | Vitest + React Testing Library: forms, loading, clarification, no-match, error/retry, cards (image vs. text fallback, omitted guidance), ratings, account settings |
+| Ingestion tests | `ingestion/tests/` | Includes a real OCR test on a generated scanned page |
+| Integration tests | `tests/integration/` | Backend as a separate process, real Supabase Auth tokens, RLS checked through Supabase's REST API |
+| Browser tests | `frontend/e2e/` | Playwright, desktop and mobile. Registration with a real confirmation email from Mailpit. |
+| Live AI smoke test | `backend/tests/test_ai.py` | Opt-in only (`RUN_LIVE_AI=1`). Makes two small billable Bedrock calls. |
+
+The demo AI understands two markers for exercising failure paths: a symptom containing `[demo:fail]` makes the AI call fail, and `[demo:invalid-id]` makes the model return a point ID that doesn't exist.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`:
+- frontend lint, tests and build
+- backend lint, type-check and tests against local Supabase
+- ingestion checks
+- integration tests
+- Playwright tests
+- Docker image builds
+- dependency audits and secret detection
 
 ## Database
 
-The app uses Supabase (PostgreSQL + `pgvector`, Auth, Storage). Schema and policies are plain SQL scripts in `db/`, applied in file-name order — there is no migration framework.
+The schema, RLS policies and storage bucket are plain SQL scripts in `db/`, applied in file-name order. There is deliberately no migration framework. All scripts are idempotent.
 
-**Local:** `make supabase-start` runs the Supabase stack in Docker via the Supabase CLI (Studio on http://127.0.0.1:54323, test emails in Mailpit on http://127.0.0.1:54324). Then run `make db-setup` to apply the scripts. `make db-reset` recreates the local database and reapplies them. `make db-seed` loads invented development data (`db/seed/`: six symptom categories, seven points, two placeholder diagrams) — local only, never production.
-
-**Hosted:** set `DATABASE_URL` in `.env` to the project's connection string (Supabase dashboard → Connect) and run `make db-setup`. Scripts are idempotent and safe to re-run.
-
-Database tests in `backend/tests/db/` run against `DATABASE_URL` and are skipped if it is unreachable (CI sets `REQUIRE_DB=1` so they fail instead).
+- **Curated content** (`points`, `symptom_categories`, `point_categories`, `sources`, `knowledge_chunks`): readable by signed-in users, writable only by privileged connections.
+- **User data** (`recommendation_attempts`, `recommendation_points`, `point_ratings`): each user can read only their own rows. Users can't write through the Supabase API; the backend validates and writes for them. All of it cascades from `auth.users`, so deleting an account removes it.
+- **Hosted Supabase:** set `DATABASE_URL` to the project's connection string (Dashboard → Connect) and run `make db-setup`.
 
 ## Knowledge ingestion
 
-`ingestion/` is a Python pipeline that turns curated source documents into the knowledge base.
+`ingestion/` turns curated source documents into the knowledge base. Run it from `ingestion/`. `sources/` and `out/` are git-ignored.
 
-**Step 1 — extract text.** List local source files (PDF, `.txt`, `.md`) in a JSON manifest with their metadata, then run:
+1. **Extract text** from local PDF, `.txt` or `.md` files listed in a JSON manifest. Each page's text is cleaned; pages with no text layer are read with Tesseract OCR using the source language.
 
-```sh
-cd ingestion
-uv run python -m ingestion.extract sources/manifest.json -o out/pages.jsonl
-```
+   ```sh
+   uv run python -m ingestion.extract sources/manifest.json -o out/pages.jsonl
+   ```
+   ```json
+   {"sources": [{"file": "guide.pdf", "title": "Guide title", "language": "en",
+                 "author": "Author", "url": "https://...", "license": "CC BY 4.0"}]}
+   ```
 
-```json
-{"sources": [{"file": "guide.pdf", "title": "Guide title", "language": "en",
-              "author": "Author", "url": "https://...", "license": "CC BY 4.0"}]}
-```
+2. **Translate, chunk, embed and store.**
+   - Non-English pages are translated into English with Claude; the source keeps its original language and page references.
+   - Text is split into ~1,000-character overlapping chunks.
+   - Each chunk is embedded with Titan Text Embeddings V2.
+   - Chunks are stored in `knowledge_chunks`. A chunk that mentions exactly one known point code is linked to that point.
+   - Re-running a source replaces its chunks.
 
-Each output line holds one page's cleaned text, its page number and the source metadata. Pages without extractable text are OCR'd with Tesseract (`brew install tesseract` / `apt-get install tesseract-ocr`, plus language packs for non-English sources). `ingestion/sources/` and `ingestion/out/` are git-ignored.
+   ```sh
+   uv run python -m ingestion.load out/pages.jsonl
+   ```
 
-**Step 2 — translate, chunk, embed and store.**
+3. **Catalogue point images** by hand. Each image has an explicit `permitted` decision plus its attribution and licence. Permitted images are uploaded to the public `point-images` bucket and linked to their point; `"permitted": false` clears any existing image, so the app shows the text location instead. Only use images whose licence allows it.
 
-```sh
-uv run python -m ingestion.load out/pages.jsonl
-```
+   ```sh
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... uv run python -m ingestion.images sources/images.json
+   ```
+   ```json
+   {"images": [{"point_id": "LI4", "file": "images/li4.png", "permitted": true,
+                "attribution": "Figure 3, A. Author", "license": "CC BY 4.0",
+                "source_title": "Guide title", "page": 12}]}
+   ```
 
-Non-English pages are translated into English with Claude on Amazon Bedrock (the source keeps its original language and page references). Text is split into ~1,000-character overlapping chunks, embedded with Amazon Titan Text Embeddings V2 (1,024 dimensions) and stored in `knowledge_chunks`. A chunk that mentions exactly one known point code (e.g. `LI4`) is linked to that point. Re-running a source replaces its chunks. Configuration comes from `DATABASE_URL`, `AWS_REGION`, `BEDROCK_TEXT_MODEL_ID` and `BEDROCK_EMBEDDING_MODEL_ID`; set `AI_PROVIDER=fake` to run offline with deterministic fake embeddings.
+## Errors, logging and privacy
 
-**Step 3 — point images.** Location images are catalogued by hand in a JSON manifest, each with an explicit usage decision:
+- **One error shape.** Every API error looks like `{"error": {"code", "message", "retryable"}}`, with a generic message that's safe to show. Stack traces, provider errors, prompts and request IDs never appear in responses.
+- **Failures are retryable and recorded.** AI or technical failures return `502 recommendation_failed` with `retryable: true`, and the attempt is stored as `failed`.
+- **Logs** record attempt IDs, outcomes and error classes. Symptom text is never logged. Unexpected exceptions are logged with their class and stack frames but not their message, because messages can echo stored values.
+- **Secrets stay off the frontend.** AWS credentials and the Supabase service-role key exist only on the backend.
 
-```json
-{"images": [{"point_id": "LI4", "file": "images/li4.png", "permitted": true,
-             "attribution": "Figure 3, A. Author", "license": "CC BY 4.0",
-             "source_title": "Guide title", "page": 12}]}
-```
+## Troubleshooting
 
-```sh
-SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... uv run python -m ingestion.images sources/images.json
-```
+| Symptom | Fix |
+|---|---|
+| Frontend shows "VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set" | Run `make supabase-env` (local) or fill both values in `.env`, then restart Vite/Compose |
+| Every API call returns 401 | The backend's `SUPABASE_URL` must point at the same Supabase project that issued the token. Inside Docker, the backend uses `host.docker.internal` by default. |
+| Recommendations always fail with "Something went wrong" | Check the backend logs. With `AI_PROVIDER=bedrock` you need AWS credentials and model access in `AWS_REGION`. Use `AI_PROVIDER=fake` to work offline. |
+| Images don't load | Run `make db-seed` (local) so the dev images are uploaded. The browser must reach `SUPABASE_PUBLIC_URL`. |
+| No confirmation email | Local emails go to Mailpit at http://127.0.0.1:54324. Hosted projects need SMTP configured in Supabase. |
+| Database tests are skipped | Start local Supabase (`make supabase-start db-setup`). Set `REQUIRE_DB=1` to make them fail instead. |
+| `make db-seed` refuses to run | It only runs against a local `DATABASE_URL`, by design. |
 
-All entries are validated first (known point, attribution and licence present, PNG/JPEG/WebP/SVG file exists). Permitted images are uploaded to the public `point-images` bucket as `points/<point_id>.<ext>` and linked with their attribution, source and page. Only use images whose licence allows it; entries with `"permitted": false` clear any existing image so the app shows the text location instead.
+## Deployment
 
-## AI provider
+Cloud deployment happens only after the complete application passes the local tests. The hosting setup, URLs and release process will be documented here once deployed.
 
-The backend and ingestion call Amazon Bedrock: Claude (via the Anthropic SDK's `AnthropicBedrockMantle` client, model `BEDROCK_TEXT_MODEL_ID`, default `anthropic.claude-opus-5-5`) for structured generation and translation, and Titan Text Embeddings V2 for 1,024-dimension embeddings. AWS credentials come from the standard AWS environment variables or `~/.aws`, and stay on the backend.
+## AI-assisted development
 
-Automated tests never call AWS: they use a programmable `FakeAI`. Set `AI_PROVIDER=fake` to run the app offline. To check the real integration once credentials and model access are set up, run the opt-in smoke test (it makes two small billable calls):
-
-```sh
-cd backend && RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
-```
-
-## Errors and logging
-
-Every API error uses one shape: `{"error": {"code": "...", "message": "...", "retryable": true|false}}`. Messages are generic and safe to show; responses never include stack traces, provider errors, prompts or request ids. AI or technical failures during a recommendation return `502 recommendation_failed` with `retryable: true`, and the attempt is stored with outcome `failed`.
-
-Logs (level from `LOG_LEVEL`, default `INFO`) record attempt ids, outcomes and error classes. Symptom text is never logged, and unexpected exceptions are logged with their class and stack frames but not their message, since messages can echo stored values.
-
-## Integration tests
-
-`tests/integration/` starts the real backend as a separate process against local Supabase (with the development seed data) and the offline demo AI, then exercises the API over HTTP with real Supabase Auth tokens: recommendation outcomes, an unknown point id from the model, feedback storage, user data isolation (also directly through Supabase's REST API, where RLS applies) and account deletion.
-
-```sh
-make supabase-start
-make test-integration   # applies db/ scripts and seed data first
-```
-
-The demo AI (`AI_PROVIDER=fake`, never for production) understands two markers for testing failure paths: a symptom containing `[demo:fail]` makes the AI call fail, and `[demo:invalid-id]` makes it return a point id that does not exist.
-
-## Browser tests
-
-A small Playwright suite (`frontend/e2e/`) runs key flows in Chromium at desktop and mobile sizes: registering with a real confirmation email (read from local Mailpit), signing in and out, protected pages, submitting a symptom, answering a clarifying question, seeing three recommendations, rating a point, and the generic error with retry. Playwright starts the backend with the demo AI and the Vite dev server itself.
-
-```sh
-make supabase-start
-cd frontend && npx playwright install chromium   # once
-make e2e
-```
+The project was built with coding agents following [`AGENTS.md`](AGENTS.md), [`_docs/process.md`](_docs/process.md) and the roles in [`_docs/roles/`](_docs/roles/). See [`_docs/ai-workflow.md`](_docs/ai-workflow.md) for the workflow, prompts, context files, review and verification steps.
