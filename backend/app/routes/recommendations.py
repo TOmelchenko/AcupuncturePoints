@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends
 from app.ai import AI, get_ai
 from app.auth import CurrentUser, get_current_user
 from app.db import get_db
-from app.errors import ApiError, error_responses
+from app.errors import error_responses
+from app.feedback import save_rating
 from app.recommender import Recommender
 from app.schemas import (
     ClarificationRequest,
@@ -22,7 +23,6 @@ router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 User = Annotated[CurrentUser, Depends(get_current_user)]
 Db = Annotated[psycopg.Connection, Depends(get_db)]
 Ai = Annotated[AI, Depends(get_ai)]
-NOT_IMPLEMENTED = ApiError(501, "not_implemented", "This feature is not available yet.")
 
 
 @router.post(
@@ -62,6 +62,6 @@ def answer_clarification(
     responses=error_responses(401, 404, 422),
 )
 def submit_feedback(
-    attempt_id: uuid.UUID, point_id: str, body: FeedbackRequest, user: User
+    attempt_id: uuid.UUID, point_id: str, body: FeedbackRequest, user: User, db: Db
 ) -> FeedbackResponse:
-    raise NOT_IMPLEMENTED
+    return save_rating(db, user.id, attempt_id, point_id, body.rating)
