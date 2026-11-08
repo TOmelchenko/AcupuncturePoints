@@ -1,4 +1,4 @@
-.PHONY: install env up down logs test test-backend test-frontend test-ingestion test-integration lint lint-backend lint-frontend lint-ingestion lint-integration \
+.PHONY: install env up down logs test test-backend test-frontend test-ingestion test-integration e2e lint lint-backend lint-frontend lint-ingestion lint-integration \
 	security audit-backend audit-frontend audit-ingestion pip-audit secrets \
 	supabase-start supabase-stop supabase-env db-setup db-reset db-seed
 
@@ -36,6 +36,10 @@ test-frontend:
 
 test-ingestion:
 	cd ingestion && uv run pytest
+
+# Browser tests: Playwright starts the backend (demo AI) and Vite against local Supabase
+e2e: db-setup db-seed
+	cd frontend && npx playwright test
 
 # Running backend + local Supabase (seed data) + demo AI, over HTTP with real Auth tokens
 test-integration: db-setup db-seed

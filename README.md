@@ -93,3 +93,13 @@ make test-integration   # applies db/ scripts and seed data first
 ```
 
 The demo AI (`AI_PROVIDER=fake`, never for production) understands two markers for testing failure paths: a symptom containing `[demo:fail]` makes the AI call fail, and `[demo:invalid-id]` makes it return a point id that does not exist.
+
+## Browser tests
+
+A small Playwright suite (`frontend/e2e/`) runs key flows in Chromium at desktop and mobile sizes: registering with a real confirmation email (read from local Mailpit), signing in and out, protected pages, submitting a symptom, answering a clarifying question, seeing three recommendations, rating a point, and the generic error with retry. Playwright starts the backend with the demo AI and the Vite dev server itself.
+
+```sh
+make supabase-start
+cd frontend && npx playwright install chromium   # once
+make e2e
+```
