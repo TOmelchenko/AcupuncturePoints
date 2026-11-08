@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "FastAPI backend for the Acupressure Recommendation App"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic[bedrock]>=2.6.0",
+    "boto3>=1.43.126",
     "fastapi>=0.162.2",
     "psycopg[binary]>=3.3.8",
     "pyjwt[crypto]>=2.15.1",
@@ -30,3 +32,7 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
+ignore_missing_imports = true

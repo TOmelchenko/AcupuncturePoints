@@ -66,3 +66,13 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... uv run python -m ingestion.images
 ```
 
 All entries are validated first (known point, attribution and licence present, PNG/JPEG/WebP/SVG file exists). Permitted images are uploaded to the public `point-images` bucket as `points/<point_id>.<ext>` and linked with their attribution, source and page. Only use images whose licence allows it; entries with `"permitted": false` clear any existing image so the app shows the text location instead.
+
+## AI provider
+
+The backend and ingestion call Amazon Bedrock: Claude (via the Anthropic SDK's `AnthropicBedrockMantle` client, model `BEDROCK_TEXT_MODEL_ID`, default `anthropic.claude-opus-5-5`) for structured generation and translation, and Titan Text Embeddings V2 for 1,024-dimension embeddings. AWS credentials come from the standard AWS environment variables or `~/.aws`, and stay on the backend.
+
+Automated tests never call AWS: they use a programmable `FakeAI`. Set `AI_PROVIDER=fake` to run the app offline. To check the real integration once credentials and model access are set up, run the opt-in smoke test (it makes two small billable calls):
+
+```sh
+cd backend && RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
+```
