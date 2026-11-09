@@ -16,6 +16,8 @@ from typing import Protocol
 EMBEDDING_DIMENSIONS = 1024
 DEFAULT_EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
 DEFAULT_TEXT_MODEL = "anthropic.claude-opus-5-5"
+# Retries per Bedrock call; "adaptive" mode also rate-limits the client after throttling.
+BEDROCK_MAX_ATTEMPTS = 12
 
 TRANSLATE_PROMPT = (
     "Translate the following text from the language with ISO code '{language}' into English. "
@@ -34,12 +36,15 @@ class BedrockAI:
     def __init__(self) -> None:
         import boto3
         from anthropic import AnthropicBedrockMantle
+        from botocore.config import Config
 
         region = os.environ.get("AWS_REGION", "us-east-1")
         self.embedding_model = os.environ.get("BEDROCK_EMBEDDING_MODEL_ID", DEFAULT_EMBEDDING_MODEL)
         self.text_model = os.environ.get("BEDROCK_TEXT_MODEL_ID", DEFAULT_TEXT_MODEL)
-        self.runtime = boto3.client("bedrock-runtime", region_name=region)
-        self.claude = AnthropicBedrockMantle(aws_region=region, timeout=120.0)
+        # Ingestion is a batch job: on throttling, slow down and keep retrying.
+        retries = Config(retries={"max_attempts": BEDROCK_MAX_ATTEMPTS, "mode": "adaptive"})
+        self.runtime = boto3.client("bedrock-runtime", region_name=region, config=retries)
+        self.claude = AnthropicBedrockMantle(aws_region=region, timeout=120.0, max_retries=8)
 
     def embed(self, text: str) -> list[float]:
         response = self.runtime.invoke_model(

@@ -82,3 +82,9 @@ def test_bedrock_translate_returns_text_and_rejects_incomplete(bedrock: BedrockA
     assert "'de'" in requests[0]["messages"][0]["content"]
     with pytest.raises(RuntimeError):
         bedrock.translate("Hallo", "de")
+
+
+def test_bedrock_retries_throttled_calls_adaptively(bedrock: BedrockAI) -> None:
+    retries = bedrock.runtime.meta.config.retries
+    assert retries["mode"] == "adaptive"
+    assert retries["total_max_attempts"] == 12 + 1  # first try plus retries

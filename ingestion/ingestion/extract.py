@@ -6,9 +6,14 @@ its title, language, licence and URL into later steps:
     {
       "sources": [
         {"file": "pdfs/guide.pdf", "title": "...", "language": "en",
-         "author": "...", "url": "...", "license": "..."}
+         "author": "...", "url": "...", "license": "...",
+         "pages": "33-232", "drop_lines": ["^Stomach Meridian\\d+$"], "use_ocr": false}
       ]
     }
+
+Optional fields: `pages` limits extraction to a page range, `drop_lines` lists
+regular expressions for running headers and footers to remove, and `use_ocr`
+(default true) can turn off OCR for pages that hold only diagrams.
 
 Usage:
     uv run python -m ingestion.extract sources/manifest.json -o out/pages.jsonl
@@ -19,7 +24,7 @@ import json
 import logging
 import re
 import unicodedata
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import pypdfium2
@@ -53,6 +58,15 @@ class Source:
     author: str | None = None
     url: str | None = None
     license: str | None = None
+    pages: str | None = None  # e.g. "33-232", 1-based and inclusive
+    drop_lines: list[str] = field(default_factory=list)
+    use_ocr: bool = True
+
+    def page_range(self) -> range | None:
+        if not self.pages:
+            return None
+        first, _, last = self.pages.partition("-")
+        return range(int(first), int(last or first) + 1)
 
 
 @dataclass
@@ -63,17 +77,42 @@ class Page:
     ocr: bool = False
 
 
-def clean_text(text: str) -> str:
-    """Normalise extracted text while keeping paragraph breaks."""
+# Page numbers such as "12" or "- 12 -".
+PAGE_NUMBER = re.compile(r"-?\s*\d+\s*-?")
+# Figure labels: a line holding only point codes, e.g. "ST21 ST22".
+FIGURE_LABEL = re.compile(r"(?:[A-Z]{2}\d{1,2}\s*)+")
+# A point entry such as "ST21: Liangmen" starts a new paragraph.
+POINT_HEADING = re.compile(r"[A-Z][A-Za-z]\d{1,2}: ")
+
+
+def clean_text(text: str, drop_lines: list[str] | None = None) -> str:
+    """Normalise extracted text while keeping paragraph breaks.
+
+    Drops page numbers, figure labels and lines matching `drop_lines` patterns,
+    and starts a new paragraph at each point heading.
+    """
     text = unicodedata.normalize("NFKC", text)
     text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)  # re-join words hyphenated across lines
+    dropped = [re.compile(pattern) for pattern in drop_lines or []]
     paragraphs = []
-    for block in re.split(r"\n\s*\n", text):
-        lines = [line.strip() for line in block.splitlines()]
-        lines = [line for line in lines if line and not line.isdigit()]  # drop page numbers
+
+    def close(lines: list[str]) -> None:
         paragraph = re.sub(r"\s+", " ", " ".join(lines)).strip()
         if paragraph:
             paragraphs.append(paragraph)
+
+    for block in re.split(r"\n\s*\n", text):
+        current: list[str] = []
+        for line in (line.strip() for line in block.splitlines()):
+            if not line or PAGE_NUMBER.fullmatch(line) or FIGURE_LABEL.fullmatch(line):
+                continue
+            if any(pattern.search(line) for pattern in dropped):
+                continue
+            if POINT_HEADING.match(line):
+                close(current)
+                current = []
+            current.append(line)
+        close(current)
     return "\n\n".join(paragraphs)
 
 
@@ -89,11 +128,15 @@ def ocr_pdf_page(path: Path, page_index: int, language: str) -> str:
 
 def extract_pdf(path: Path, source: Source) -> list[Page]:
     pages = []
+    wanted = source.page_range()
     for index, pdf_page in enumerate(PdfReader(path).pages):
-        text, used_ocr = clean_text(pdf_page.extract_text() or ""), False
-        if len(text.replace(" ", "")) < MIN_TEXT_CHARS:
+        if wanted is not None and index + 1 not in wanted:
+            continue
+        text, used_ocr = clean_text(pdf_page.extract_text() or "", source.drop_lines), False
+        if len(text.replace(" ", "")) < MIN_TEXT_CHARS and source.use_ocr:
             try:
-                text, used_ocr = clean_text(ocr_pdf_page(path, index, source.language)), True
+                ocr_text = ocr_pdf_page(path, index, source.language)
+                text, used_ocr = clean_text(ocr_text, source.drop_lines), True
             except pytesseract.TesseractNotFoundError:
                 log.warning("Tesseract not installed; cannot OCR %s page %d", path.name, index + 1)
         if text:
@@ -109,7 +152,7 @@ def extract_source(source: Source, base_dir: Path) -> list[Page]:
     if suffix == ".pdf":
         return extract_pdf(path, source)
     if suffix in {".txt", ".md"}:
-        text = clean_text(path.read_text(encoding="utf-8"))
+        text = clean_text(path.read_text(encoding="utf-8"), source.drop_lines)
         return [Page(source, 1, text)] if text else []
     raise ValueError(f"Unsupported source file type: {path.name}")
 

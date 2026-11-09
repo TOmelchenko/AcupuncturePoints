@@ -145,30 +145,56 @@ The schema, RLS policies and storage bucket are plain SQL scripts in `db/`, appl
 
 ## Knowledge ingestion
 
-`ingestion/` turns curated source documents into the knowledge base. Run it from `ingestion/`. `sources/` and `out/` are git-ignored.
+`ingestion/` turns curated source documents into the knowledge base. Run it from `ingestion/`. `sources/` and `out/` are git-ignored. Run the steps in this order, because chunks can only be linked to points that already exist.
 
-1. **Extract text** from local PDF, `.txt` or `.md` files listed in a JSON manifest. Each page's text is cleaned; pages with no text layer are read with Tesseract OCR using the source language.
+**Current sources:**
+- The [meine-tcm.com acupuncture point atlas](https://www.meine-tcm.com/en/atlas-of-acupuncture-points/) supplies the curated points: location, symptoms, acupressure steps, duration and pressure.
+- The WHO *Standard Acupuncture Point Locations* (`infosource/`, pages 34–241) adds location text for all 361 points.
+
+The site states no licence, so its text is used for retrieval with attribution and its images are not reused.
+
+1. **Curated points from the web atlas.** `ingestion.web` downloads the point pages once into `sources/web/meine-tcm/html/` (re-runs use the saved copies; `--refresh` downloads again) and parses them into `points.json`. `ingestion.points` then:
+   - upserts each point (name, location, instructions, duration, pressure). A pregnancy contraindication is added as the last instruction.
+   - maps each point's "helps with" symptoms to the self-care categories defined in `ingestion/points.py`. Serious conditions such as hypertension are deliberately not mapped.
+   - stores one chunk per point, linked to that point.
+
+   Existing images are kept, and re-running replaces the category links and chunks.
+
+   ```sh
+   uv run python -m ingestion.web sources/web/meine-tcm
+   uv run python -m ingestion.points sources/web/meine-tcm/points.json
+   ```
+
+2. **Extract text** from local PDF, `.txt` or `.md` files listed in a JSON manifest. Each page's text is cleaned; pages with no text layer are read with Tesseract OCR using the source language.
 
    ```sh
    uv run python -m ingestion.extract sources/manifest.json -o out/pages.jsonl
    ```
    ```json
    {"sources": [{"file": "guide.pdf", "title": "Guide title", "language": "en",
-                 "author": "Author", "url": "https://...", "license": "CC BY 4.0"}]}
+                 "author": "Author", "url": "https://...", "license": "CC BY 4.0",
+                 "pages": "34-241", "drop_lines": ["^Stomach Meridian\\s*\\d+$"], "use_ocr": false}]}
    ```
 
-2. **Translate, chunk, embed and store.**
+   Optional fields:
+   - `pages` limits extraction to a page range.
+   - `drop_lines` lists regular expressions for running headers to remove.
+   - `use_ocr: false` skips OCR, e.g. on pages that hold only diagrams.
+
+   Page numbers and figure labels (lines holding only point codes) are always dropped. A point entry such as `ST21: Liangmen` starts a new paragraph.
+
+3. **Translate, chunk, embed and store.**
    - Non-English pages are translated into English with Claude; the source keeps its original language and page references.
-   - Text is split into ~1,000-character overlapping chunks.
+   - Text is split into ~1,000-character overlapping chunks. A new chunk starts at each point heading.
    - Each chunk is embedded with Titan Text Embeddings V2.
-   - Chunks are stored in `knowledge_chunks`. A chunk that mentions exactly one known point code is linked to that point.
+   - Chunks are stored in `knowledge_chunks`. A chunk is linked to a known point when it is headed by that point's code, or otherwise when it mentions exactly one known code. Codes are normalised first, so `Li 04`, `LI-4` and `LI4` all count as `LI4`, and `TB`/`SJ`/`LV`/`Pe` become `TE`/`LR`/`PC`.
    - Re-running a source replaces its chunks.
 
    ```sh
    uv run python -m ingestion.load out/pages.jsonl
    ```
 
-3. **Catalogue point images** by hand. Each image has an explicit `permitted` decision plus its attribution and licence. Permitted images are uploaded to the public `point-images` bucket and linked to their point; `"permitted": false` clears any existing image, so the app shows the text location instead. Only use images whose licence allows it.
+4. **Catalogue point images** by hand. Each image has an explicit `permitted` decision plus its attribution and licence. Permitted images are uploaded to the public `point-images` bucket and linked to their point; `"permitted": false` clears any existing image, so the app shows the text location instead. Only use images whose licence allows it.
 
    ```sh
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... uv run python -m ingestion.images sources/images.json

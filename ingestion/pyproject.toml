@@ -35,5 +35,5 @@ dev = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["pypdfium2", "pytesseract", "boto3"]
+module = ["pypdfium2", "pytesseract", "boto3", "botocore.*"]
 ignore_missing_imports = true

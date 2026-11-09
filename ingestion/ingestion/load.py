@@ -1,8 +1,9 @@
 """Steps 2-4 of ingestion: translate, chunk, embed and store extracted pages.
 
 Reads the JSONL written by `ingestion.extract`, then for each source:
-translates non-English pages into English, splits them into chunks, embeds each
-chunk and stores it in `knowledge_chunks` with its source and page reference.
+translates non-English pages into English, splits them into chunks (a new chunk
+starts at each "CODE: Name" point heading), embeds each chunk and stores it in
+`knowledge_chunks` with its source, page reference and the point it is about.
 Re-running replaces the chunks of each source, so the step is repeatable.
 
 Usage:
@@ -23,10 +24,13 @@ import psycopg
 
 from ingestion.ai import AI, get_ai
 from ingestion.chunk import chunk_text
+from ingestion.codes import normalize_codes
 
 log = logging.getLogger(__name__)
 
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+# A paragraph that starts with a point code and a colon, as in the WHO atlas ("ST21: Liangmen").
+POINT_HEADING = re.compile(r"(?:[A-Z]{2}\d{1,2}|EX-[A-Z]+\d+)(?=: )")
 
 
 def read_pages(path: Path) -> dict[str, list[dict[str, Any]]]:
@@ -61,9 +65,41 @@ def upsert_source(conn: psycopg.Connection, source: dict[str, Any]) -> int:
 
 
 def mentioned_point(text: str, point_ids: set[str]) -> str | None:
-    """The curated point a chunk is about, when it mentions exactly one point code."""
+    """The curated point a chunk is about, when it mentions exactly one point code.
+
+    Codes are normalised first, so "LI 4", "Li-04" and "LI4" all count as LI4.
+    """
+    text = normalize_codes(text)
     found = {pid for pid in point_ids if re.search(rf"(?<![\w-]){re.escape(pid)}(?![\w-])", text)}
     return found.pop() if len(found) == 1 else None
+
+
+def heading_point(section: str, point_ids: set[str]) -> str | None:
+    """The curated point a section is headed by, e.g. "ST21: Liangmen ..." -> "ST21"."""
+    match = POINT_HEADING.match(normalize_codes(section))
+    return match.group(0) if match and match.group(0) in point_ids else None
+
+
+def split_sections(text: str) -> list[str]:
+    """Split page text before each point heading, so each point is chunked on its own."""
+    sections = re.split(r"\n\n(?=" + POINT_HEADING.pattern + ")", text)
+    return [s for s in sections if s.strip()]
+
+
+def insert_chunk(
+    conn: psycopg.Connection,
+    ai: AI,
+    source_id: int,
+    point_id: str | None,
+    page: int | None,
+    content: str,
+) -> None:
+    conn.execute(
+        "insert into knowledge_chunks "
+        "(source_id, point_id, page, language, content, embedding) "
+        "values (%s, %s, %s, 'en', %s, %s::extensions.vector)",
+        (source_id, point_id, page, content, str(ai.embed(content))),
+    )
 
 
 def load_source(
@@ -76,20 +112,12 @@ def load_source(
         text = page["text"]
         if source["language"] != "en":
             text = ai.translate(text, source["language"])
-        for chunk in chunk_text(text):
-            conn.execute(
-                "insert into knowledge_chunks "
-                "(source_id, point_id, page, language, content, embedding) "
-                "values (%s, %s, %s, 'en', %s, %s::extensions.vector)",
-                (
-                    source_id,
-                    mentioned_point(chunk, point_ids),
-                    page["page"],
-                    chunk,
-                    str(ai.embed(chunk)),
-                ),
-            )
-            count += 1
+        for section in split_sections(text):
+            heading = heading_point(section, point_ids)
+            for chunk in chunk_text(section):
+                point_id = heading or mentioned_point(chunk, point_ids)
+                insert_chunk(conn, ai, source_id, point_id, page["page"], chunk)
+                count += 1
     return count
 
 

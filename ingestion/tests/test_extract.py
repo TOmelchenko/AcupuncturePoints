@@ -40,6 +40,22 @@ def test_clean_text_joins_hyphenation_and_drops_page_numbers() -> None:
     )
 
 
+def test_clean_text_drops_headers_figure_labels_and_splits_point_headings() -> None:
+    raw = (
+        "Test Meridian 56\nTP1: Ceshi\nOn the test hand,\nnear the wrist.\n"
+        "TP2: Other\nOn the arm.\nTP1\nTP2\n- 12 -"
+    )
+    assert clean_text(raw, [r"^Test Meridian\s*\d+$"]) == (
+        "TP1: Ceshi On the test hand, near the wrist.\n\nTP2: Other On the arm."
+    )
+
+
+def test_page_range_limits_extracted_pages(tmp_path: Path) -> None:
+    make_pdf(tmp_path / "guide.pdf", ["Front matter page.", "Point page.", "Index page."])
+    pages = extract_source(Source(file="guide.pdf", title="Guide", pages="2-2"), tmp_path)
+    assert [(p.page, p.text) for p in pages] == [(2, "Point page.")]
+
+
 def test_clean_text_normalises_unicode() -> None:
     assert clean_text("ﬁnger width") == "finger width"
 
@@ -132,4 +148,7 @@ def test_manifest_metadata_is_kept_in_output(tmp_path: Path) -> None:
         "author": "A. Author",
         "url": "https://example.org/de.pdf",
         "license": "CC BY 4.0",
+        "pages": None,
+        "drop_lines": [],
+        "use_ocr": True,
     }
