@@ -21,7 +21,7 @@ services:
       - key: AI_PROVIDER
         value: bedrock
       - key: BEDROCK_TEXT_MODEL_ID
-        value: anthropic.claude-haiku-4-5
+        value: eu.anthropic.claude-haiku-4-5-20251001-v1:0
       - key: BEDROCK_EMBEDDING_MODEL_ID
         value: amazon.titan-embed-text-v2:0
       - key: FRONTEND_HOST
@@ -78,7 +78,7 @@ services:
       - key: AI_PROVIDER
         value: bedrock
       - key: BEDROCK_TEXT_MODEL_ID
-        value: anthropic.claude-haiku-4-5
+        value: eu.anthropic.claude-haiku-4-5-20251001-v1:0
       - key: BEDROCK_EMBEDDING_MODEL_ID
         value: amazon.titan-embed-text-v2:0
       - key: FRONTEND_HOST

@@ -29,7 +29,7 @@ Do these steps in order. Keep secret values out of chat and commits: paste them 
 3. **Check locally.** Put the key in your local `.env` (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) and run the opt-in smoke test (two small billable calls):
 
    ```sh
-   cd backend && BEDROCK_TEXT_MODEL_ID=anthropic.claude-haiku-4-5 RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
+   cd backend && BEDROCK_TEXT_MODEL_ID=eu.anthropic.claude-haiku-4-5-20251001-v1:0 RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
    ```
 
 ### 2. Supabase (twice: dev and prod)
