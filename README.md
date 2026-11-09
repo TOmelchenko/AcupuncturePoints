@@ -1,6 +1,6 @@
 # acupuncture·points — Acupressure Recommendation App
 
-A responsive web app that helps people explore acupressure points for a physical or mental/emotional symptom. The user describes the symptom in their own words. An AI-assisted workflow interprets it, retrieves curated knowledge, and returns three acupressure points with a location picture (or a text description), step-by-step instructions, and duration/pressure guidance where the curated source provides it. Users rate each point after trying it, and those ratings act as a secondary ranking signal.
+A responsive web app that helps people explore acupressure points for a physical or mental/emotional symptom. The user describes the symptom in their own words. An AI-assisted workflow interprets it, retrieves curated knowledge, and returns three acupressure points with a location picture (or a text description), step-by-step instructions, and duration/pressure guidance where the curated source provides it. Users rate each point after trying it, and their own ratings act as a secondary ranking signal in their later recommendations.
 
 Requirements live in [`_docs/specification.md`](_docs/specification.md). Work is tracked as [GitHub issues](https://github.com/TOmelchenko/AcupuncturePoints/issues).
 
@@ -12,7 +12,7 @@ Requirements live in [`_docs/specification.md`](_docs/specification.md). Work is
 - **Quality depends on the sources.** Recommendations are only as good as the curated material. The repository ships with *invented development data* (`db/seed/`), not a real knowledge base; the project owner selects the real sources.
 - **Grounding reduces but cannot remove errors.** Retrieval, schema validation and point-ID checks stop the model from inventing points, images, durations or pressure guidance. They cannot guarantee that every instruction is accurate or appropriate.
 - **No efficacy claims.** The app makes no claim that acupressure treats any condition.
-- **Sparse ratings early on.** Ratings only nudge the ranking (±0.05 relevance, at least 3 ratings), so recommendations stay driven by symptom relevance.
+- **Personal, sparse ratings.** Only the user's own ratings count, and they only nudge the ranking (±0.05 relevance, full weight at 3 ratings of a point), so recommendations stay driven by symptom relevance.
 - **Sensitive data.** Symptom descriptions may contain health information. They are visible only to their owner (RLS), never logged, and deleted with the account.
 
 ## Architecture
@@ -35,7 +35,7 @@ How a recommendation request works (`backend/app/recommender.py`):
 1. **Store the attempt.** The backend verifies the Supabase access token and stores the attempt with the original symptom text.
 2. **Interpret.** Claude maps the symptom to predefined categories and search terms, or asks a clarifying question.
 3. **Retrieve.** Candidates come from two sources: points curated for the matched categories, and points linked to the most similar knowledge chunks found with a `pgvector` cosine search.
-4. **Rank.** Candidates are ordered by relevance, with past ratings as a bounded tie-breaker.
+4. **Rank.** Candidates are ordered by relevance, with the user's own past ratings as a bounded tie-breaker.
 5. **Choose.** Claude picks three of the candidates, grounded in the retrieved excerpts.
 6. **Validate.** The backend checks there are exactly three distinct IDs, all among the candidates and all present in the database. Everything the user sees comes from the curated database records.
 7. **Persist and return.** The outcome is stored (`recommended`, `clarification_needed`, `no_match` or `failed`) and returned.

@@ -35,13 +35,14 @@ def test_ratings_cannot_overturn_a_clearly_more_relevant_point() -> None:
     assert ids(result) == ["relevant", "less"]
 
 
-@pytest.mark.parametrize("signal", [None, RatingSignal(5.0, 1), RatingSignal(1.0, 2)])
+@pytest.mark.parametrize("signal", [None, RatingSignal(5.0, 0), RatingSignal(3.0, 2)])
 def test_missing_or_sparse_ratings_have_no_effect(signal: RatingSignal | None) -> None:
     assert rating_adjustment(signal) == 0.0
 
 
 def test_adjustment_is_bounded_and_grows_with_count() -> None:
-    assert rating_adjustment(RatingSignal(5.0, 3)) < rating_adjustment(RatingSignal(5.0, 10))
-    assert rating_adjustment(RatingSignal(5.0, 10)) == pytest.approx(MAX_RATING_ADJUSTMENT)
+    assert rating_adjustment(RatingSignal(5.0, 1)) > 0.0
+    assert rating_adjustment(RatingSignal(5.0, 1)) < rating_adjustment(RatingSignal(5.0, 3))
+    assert rating_adjustment(RatingSignal(5.0, 3)) == pytest.approx(MAX_RATING_ADJUSTMENT)
     assert rating_adjustment(RatingSignal(1.0, 500)) == pytest.approx(-MAX_RATING_ADJUSTMENT)
     assert rating_adjustment(RatingSignal(3.0, 50)) == 0.0

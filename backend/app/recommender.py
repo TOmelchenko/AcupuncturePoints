@@ -2,7 +2,7 @@
 
 1. Store the attempt with the original symptom text.
 2. Interpret the symptom into categories and search terms.
-3. Retrieve knowledge chunks and candidate points; rank them (ratings secondary).
+3. Retrieve knowledge chunks and candidate points; rank them (the user's own ratings secondary).
 4. Ask the model to choose three candidates, grounded in the retrieved context.
 5. Validate the choice against the curated database and build the response.
 6. Persist the outcome: clarification_needed, no_match, recommended or failed.
@@ -106,7 +106,7 @@ class Recommender:
         assert row is not None
         attempt_id: uuid.UUID = row[0]
         self.conn.commit()
-        return self._run(attempt_id, symptom, clarification=None)
+        return self._run(user_id, attempt_id, symptom, clarification=None)
 
     def clarify(
         self, user_id: uuid.UUID, attempt_id: uuid.UUID, answer: str
@@ -122,15 +122,19 @@ class Recommender:
         symptom, question = row
         self._update(attempt_id, clarification_answer=answer)
         self.conn.commit()
-        return self._run(attempt_id, symptom, clarification=(question, answer))
+        return self._run(user_id, attempt_id, symptom, clarification=(question, answer))
 
     # --- Workflow -----------------------------------------------------------------
 
     def _run(
-        self, attempt_id: uuid.UUID, symptom: str, clarification: tuple[str, str] | None
+        self,
+        user_id: uuid.UUID,
+        attempt_id: uuid.UUID,
+        symptom: str,
+        clarification: tuple[str, str] | None,
     ) -> RecommendationResponse:
         try:
-            response = self._recommend(attempt_id, symptom, clarification)
+            response = self._recommend(user_id, attempt_id, symptom, clarification)
         except AIError as exc:
             self._fail(attempt_id, exc)
             raise FAILED from None
@@ -141,7 +145,11 @@ class Recommender:
         return response
 
     def _recommend(
-        self, attempt_id: uuid.UUID, symptom: str, clarification: tuple[str, str] | None
+        self,
+        user_id: uuid.UUID,
+        attempt_id: uuid.UUID,
+        symptom: str,
+        clarification: tuple[str, str] | None,
     ) -> RecommendationResponse:
         interpretation = interpret(self.ai, symptom, load_categories(self.conn), clarification)
         self._update(attempt_id, category_ids=interpretation.category_ids)
@@ -154,7 +162,7 @@ class Recommender:
         if not retrieval.sufficient:
             return self._weak_match(attempt_id, clarification)
 
-        ranked = self._rank(retrieval, interpretation)
+        ranked = self._rank(user_id, retrieval, interpretation)
         choice = self.ai.generate(
             SYSTEM_PROMPT,
             build_prompt(symptom, clarification, retrieval, ranked),
@@ -175,9 +183,11 @@ class Recommender:
         self.conn.commit()
         return RecommendationSet(attempt_id=attempt_id, points=points)
 
-    def _rank(self, retrieval: RetrievalResult, interpretation: Interpretation) -> list[str]:
+    def _rank(
+        self, user_id: uuid.UUID, retrieval: RetrievalResult, interpretation: Interpretation
+    ) -> list[str]:
         ids = [c.point.id for c in retrieval.candidates]
-        signals = load_rating_signals(self.conn, ids, interpretation.category_ids)
+        signals = load_rating_signals(self.conn, user_id, ids, interpretation.category_ids)
         return [c.point.id for c in rank(retrieval.candidates, signals)][:MAX_CANDIDATES_FOR_MODEL]
 
     def _weak_match(

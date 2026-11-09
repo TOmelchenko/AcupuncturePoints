@@ -2,11 +2,12 @@
 
 The rating adjustment is bounded to ±MAX_RATING_ADJUSTMENT, so a point that is
 clearly less relevant (by more than twice that) can never overtake a more
-relevant one. Ratings count only when they come from attempts in an overlapping
-symptom category and only once there are at least MIN_RATINGS of them; the
-adjustment reaches full weight at FULL_WEIGHT_RATINGS.
+relevant one. Ratings are personal: only the requesting user's own ratings count,
+and only those from attempts in an overlapping symptom category. The adjustment
+starts at MIN_RATINGS and reaches full weight at FULL_WEIGHT_RATINGS.
 """
 
+import uuid
 from dataclasses import dataclass
 
 import psycopg
@@ -14,8 +15,8 @@ import psycopg
 from app.retrieval import Candidate
 
 MAX_RATING_ADJUSTMENT = 0.05
-MIN_RATINGS = 3
-FULL_WEIGHT_RATINGS = 10
+MIN_RATINGS = 1
+FULL_WEIGHT_RATINGS = 3
 
 
 @dataclass(frozen=True)
@@ -40,15 +41,16 @@ def rank(candidates: list[Candidate], signals: dict[str, RatingSignal]) -> list[
 
 
 def load_rating_signals(
-    conn: psycopg.Connection, point_ids: list[str], category_ids: list[str]
+    conn: psycopg.Connection, user_id: uuid.UUID, point_ids: list[str], category_ids: list[str]
 ) -> dict[str, RatingSignal]:
-    """Average past ratings per point, from attempts sharing a symptom category."""
+    """Average the user's own past ratings per point, from attempts sharing a symptom category."""
     if not point_ids or not category_ids:
         return {}
     rows = conn.execute(
         "select r.point_id, avg(r.rating)::float, count(*) from point_ratings r "
         "join recommendation_attempts a on a.id = r.attempt_id "
-        "where r.point_id = any(%s) and a.category_ids && %s::text[] group by r.point_id",
-        (point_ids, category_ids),
+        "where r.user_id = %s and r.point_id = any(%s) and a.category_ids && %s::text[] "
+        "group by r.point_id",
+        (user_id, point_ids, category_ids),
     ).fetchall()
     return {row[0]: RatingSignal(average=row[1], count=row[2]) for row in rows}
