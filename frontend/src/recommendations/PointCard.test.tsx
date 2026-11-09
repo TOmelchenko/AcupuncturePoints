@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { RecommendedPoint } from '@/lib/types'
 import { PointCard } from './PointCard'
 
@@ -45,4 +46,25 @@ test('shows only the guidance that is present', () => {
 test('the card is labelled by the point name', () => {
   render(<PointCard index={0} point={base} />)
   expect(screen.getByRole('article', { name: 'Hegu (Union Valley)' })).toBeInTheDocument()
+})
+
+test('clicking the image opens an enlarged view that Escape closes', async () => {
+  const user = userEvent.setup()
+  render(<PointCard index={0} point={{ ...base, image_url: 'http://img.test/li4.svg' }} />)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Enlarge image of Hegu (Union Valley)' }))
+  const dialog = screen.getByRole('dialog', { name: 'Location of Hegu (Union Valley)' })
+  expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'http://img.test/li4.svg')
+
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+test('the close button dismisses the enlarged view', async () => {
+  const user = userEvent.setup()
+  render(<PointCard index={0} point={{ ...base, image_url: 'http://img.test/li4.svg' }} />)
+  await user.click(screen.getByRole('button', { name: /Enlarge image/ }))
+  await user.click(screen.getByRole('button', { name: 'Close enlarged image' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })

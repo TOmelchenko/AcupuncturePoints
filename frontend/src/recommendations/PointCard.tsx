@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { X } from 'lucide-react'
 import type { RecommendedPoint } from '@/lib/types'
 
 interface Props {
@@ -8,21 +9,66 @@ interface Props {
   footer?: ReactNode
 }
 
+/** Full-screen view of a point image; closes on click, the close button or Escape. */
+function ImageZoom({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-4 animate-in fade-in-0"
+    >
+      <button
+        type="button"
+        autoFocus
+        aria-label="Close enlarged image"
+        onClick={onClose}
+        className="absolute right-4 top-4 rounded-full bg-card p-2 text-foreground shadow-soft"
+      >
+        <X className="size-5" />
+      </button>
+      <img src={src} alt={alt} className="max-h-full max-w-full rounded-2xl bg-secondary object-contain" />
+    </div>
+  )
+}
+
 function Visual({ point }: { point: RecommendedPoint }) {
+  const [zoomed, setZoomed] = useState(false)
   if (point.image_url) {
+    const alt = `Location of ${point.name}`
     return (
       <figure>
-        <img
-          src={point.image_url}
-          alt={`Location of ${point.name}`}
-          loading="lazy"
-          className="aspect-square w-full rounded-2xl bg-secondary object-contain"
-        />
+        <button
+          type="button"
+          onClick={() => setZoomed(true)}
+          aria-label={`Enlarge image of ${point.name}`}
+          className="block w-full cursor-zoom-in rounded-2xl"
+        >
+          <img
+            src={point.image_url}
+            alt={alt}
+            loading="lazy"
+            className="aspect-square w-full rounded-2xl bg-secondary object-contain"
+          />
+        </button>
         {point.image_attribution && (
           <figcaption className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
             {point.image_attribution}
           </figcaption>
         )}
+        {zoomed && <ImageZoom src={point.image_url} alt={alt} onClose={() => setZoomed(false)} />}
       </figure>
     )
   }
