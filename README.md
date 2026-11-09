@@ -1,4 +1,4 @@
-# pressure·point — Acupressure Recommendation App
+# acupuncture·points — Acupressure Recommendation App
 
 A responsive web app that helps people explore acupressure points for a physical or mental/emotional symptom. The user describes the symptom in their own words. An AI-assisted workflow interprets it, retrieves curated knowledge, and returns three acupressure points with a location picture (or a text description), step-by-step instructions, and duration/pressure guidance where the curated source provides it. Users rate each point after trying it, and those ratings act as a secondary ranking signal.
 

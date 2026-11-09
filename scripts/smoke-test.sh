@@ -17,4 +17,4 @@ for _ in $(seq 1 24); do
 done
 curl -fsS --max-time 20 "${api_url}/api/health" | grep -q '"ok"'
 
-curl -fsS --max-time 20 "${web_url}/" | grep -q 'pressure·point' && echo "Frontend up: ${web_url}"
+curl -fsS --max-time 20 "${web_url}/" | grep -q 'acupuncture·points' && echo "Frontend up: ${web_url}"
