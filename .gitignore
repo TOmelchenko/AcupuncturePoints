@@ -21,3 +21,4 @@ dist/
 # Ingestion working files (source documents and outputs stay local)
 ingestion/out/
 ingestion/sources/
+.claude/settings.local.json
