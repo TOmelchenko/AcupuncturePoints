@@ -26,11 +26,9 @@ services:
         value: eu.anthropic.claude-haiku-4-5-20251001-v1:0
       - key: BEDROCK_EMBEDDING_MODEL_ID
         value: amazon.titan-embed-text-v2:0
-      - key: FRONTEND_HOST
-        fromService:
-          type: web
-          name: acupressure-web-dev
-          property: host
+      # Public origin: fromService `host` is Render's internal hostname, not the browser's origin.
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://acupressure-web-dev.onrender.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
@@ -81,11 +79,9 @@ services:
         value: eu.anthropic.claude-haiku-4-5-20251001-v1:0
       - key: BEDROCK_EMBEDDING_MODEL_ID
         value: amazon.titan-embed-text-v2:0
-      - key: FRONTEND_HOST
-        fromService:
-          type: web
-          name: acupressure-web-prod
-          property: host
+      # Public origin: fromService `host` is Render's internal hostname, not the browser's origin.
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://acupressure-web-prod.onrender.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
