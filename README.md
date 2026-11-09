@@ -151,9 +151,9 @@ The schema, RLS policies and storage bucket are plain SQL scripts in `db/`, appl
 - The [meine-tcm.com acupuncture point atlas](https://www.meine-tcm.com/en/atlas-of-acupuncture-points/) supplies the curated points: location, symptoms, acupressure steps, duration and pressure.
 - The WHO *Standard Acupuncture Point Locations* (`infosource/`, pages 34–241) adds location text for all 361 points.
 
-The site states no licence, so its text is used for retrieval with attribution and its images are not reused.
+meine-tcm.com gave permission (November 2026) to use its text and point pictures in this non-commercial project, credited "Image: meine-tcm.com".
 
-1. **Curated points from the web atlas.** `ingestion.web` downloads the point pages once into `sources/web/meine-tcm/html/` (re-runs use the saved copies; `--refresh` downloads again) and parses them into `points.json`. `ingestion.points` then:
+1. **Curated points from the web atlas.** `ingestion.web` downloads the point pages and location pictures once into `sources/web/meine-tcm/` (re-runs use the saved copies; `--refresh` downloads again). It writes `points.json`, plus `images.json` for step 4. `ingestion.points` then:
    - upserts each point (name, location, instructions, duration, pressure). A pregnancy contraindication is added as the last instruction.
    - maps each point's "helps with" symptoms to the self-care categories defined in `ingestion/points.py`. Serious conditions such as hypertension are deliberately not mapped.
    - stores one chunk per point, linked to that point.
@@ -163,6 +163,7 @@ The site states no licence, so its text is used for retrieval with attribution a
    ```sh
    uv run python -m ingestion.web sources/web/meine-tcm
    uv run python -m ingestion.points sources/web/meine-tcm/points.json
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... uv run python -m ingestion.images sources/web/meine-tcm/images.json
    ```
 
 2. **Extract text** from local PDF, `.txt` or `.md` files listed in a JSON manifest. Each page's text is cleaned; pages with no text layer are read with Tesseract OCR using the source language.

@@ -1,4 +1,4 @@
-from ingestion.web import parse_point, point_id, point_links
+from ingestion.web import location_image_url, parse_point, point_id, point_links
 
 URL = "https://www.meine-tcm.com/en/acupuncture-points/acupuncture-point-tb-05/"
 
@@ -9,7 +9,9 @@ PAGE = """
 <main>
   <div class="col-inner"><h1>Acupuncture Point Tb 05</h1></div>
   <h3>A test point for wrist comfort.</h3>
-  <img src="lage.jpg" alt="Location graphic">
+  <img src="https://example.org/lage-607x400.jpg" alt="Location acupuncture point Tb 05"
+       srcset="https://example.org/lage-607x400.jpg 607w, https://example.org/lage-800x527.jpg 800w,
+               https://example.org/lage.jpg 1160w">
   <h4>Location:</h4>
   <p>Two finger-widths above the back of the wrist, between the bones.</p>
   <h2>Outer Test Gate — Wài Cè</h2>
@@ -62,6 +64,13 @@ def test_parse_point_extracts_curated_fields() -> None:
     assert point.pressure == "Medium pressure"
     assert point.meridian == "Triple Burner"
     assert point.names == ["Test name", "Tb 05"]
+    assert point.image_url == "https://example.org/lage-800x527.jpg"
+
+
+def test_location_image_falls_back_to_src() -> None:
+    html = '<img src="https://example.org/a.jpg" alt="Location acupuncture point X">'
+    assert location_image_url(html) == "https://example.org/a.jpg"
+    assert location_image_url('<img src="b.jpg" alt="AkuPen">') is None
 
 
 def test_point_id_maps_slugs_to_who_and_extra_codes() -> None:
