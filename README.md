@@ -237,8 +237,10 @@ Setup steps, the release process and rollback are in [`_docs/deployment.md`](_do
 
 | Environment | URL |
 |---|---|
-| Development | *added after the first deployment* |
+| Development | https://acupressure-web-dev.onrender.com (API: https://acupressure-api-dev.onrender.com) |
 | Production | *added after the first deployment* |
+
+Development currently runs the offline demo AI (`AI_PROVIDER=fake`) with fake embeddings, until the AWS Bedrock quota is raised; recommendations there come from simple keyword matching, so try symptoms such as "headache" or "neck and shoulder pain". The free services sleep when idle, so the first request can take about a minute.
 
 ## AI-assisted development
 

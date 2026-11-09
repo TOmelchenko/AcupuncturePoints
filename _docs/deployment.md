@@ -14,6 +14,8 @@ Everything is defined in `render.yaml` (Render Blueprint) and two workflows:
 - **`.github/workflows/deploy-dev.yml`** runs automatically after CI passes on `main`. It applies the `db/` scripts to the dev database, deploys that exact commit (backend, then frontend), and smoke-tests it.
 - **`.github/workflows/deploy-prod.yml`** runs manually (Actions → *Deploy to production* → Run workflow). It only accepts a commit that passed CI and was deployed to development, waits for approval on the `production` environment, then deploys and smoke-tests it.
 
+**Render gotcha:** `fromService … property: host` resolves to Render's *internal* hostname (e.g. `acupressure-api-dev`), which browsers cannot reach. That is why `render.yaml` sets the public URLs explicitly in `VITE_API_BASE_URL` and `CORS_ALLOWED_ORIGINS`. Environment changes in `render.yaml` apply only after a Blueprint sync, not on a commit deploy.
+
 **Free-tier trade-offs:**
 - Free Render web services sleep after 15 minutes idle, so the first request then takes about a minute. The upgrade is $7/month per service.
 - Free Supabase projects pause after 7 days without activity until you restore them in the dashboard.
