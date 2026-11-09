@@ -18,8 +18,10 @@ services:
     healthCheckPath: /api/health
     autoDeployTrigger: "off"
     envVars:
+      # Temporarily `fake` (offline demo AI) until the AWS Bedrock quota is raised;
+      # then set back to `bedrock` and re-ingest the knowledge base with real embeddings.
       - key: AI_PROVIDER
-        value: bedrock
+        value: fake
       - key: BEDROCK_TEXT_MODEL_ID
         value: eu.anthropic.claude-haiku-4-5-20251001-v1:0
       - key: BEDROCK_EMBEDDING_MODEL_ID
