@@ -191,7 +191,7 @@ meine-tcm.com gave permission (November 2026) to use its text and point pictures
 3. **Translate, chunk, embed and store.**
    - Non-English pages are translated into English with Claude; the source keeps its original language and page references.
    - Text is split into ~1,000-character overlapping chunks. A new chunk starts at each point heading.
-   - Each chunk is embedded with Titan Text Embeddings V2.
+   - Each chunk is embedded with Voyage AI `voyage-3.5` (or Titan Text Embeddings V2 with `AI_PROVIDER=bedrock`).
    - Chunks are stored in `knowledge_chunks`. A chunk is linked to a known point when it is headed by that point's code, or otherwise when it mentions exactly one known code. Codes are normalised first, so `Li 04`, `LI-4` and `LI4` all count as `LI4`, and `TB`/`SJ`/`LV`/`Pe` become `TE`/`LR`/`PC`.
    - Re-running a source replaces its chunks.
 
@@ -215,7 +215,7 @@ meine-tcm.com gave permission (November 2026) to use its text and point pictures
 - **One error shape.** Every API error looks like `{"error": {"code", "message", "retryable"}}`, with a generic message that's safe to show. Stack traces, provider errors, prompts and request IDs never appear in responses.
 - **Failures are retryable and recorded.** AI or technical failures return `502 recommendation_failed` with `retryable: true`, and the attempt is stored as `failed`.
 - **Logs** record attempt IDs, outcomes and error classes. Symptom text is never logged. Unexpected exceptions are logged with their class and stack frames but not their message, because messages can echo stored values.
-- **Secrets stay off the frontend.** AWS credentials and the Supabase service-role key exist only on the backend.
+- **Secrets stay off the frontend.** AI provider keys and the Supabase service-role key exist only on the backend.
 
 ## Troubleshooting
 
@@ -223,7 +223,7 @@ meine-tcm.com gave permission (November 2026) to use its text and point pictures
 |---|---|
 | Frontend shows "VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set" | Run `make supabase-env` (local) or fill both values in `.env`, then restart Vite/Compose |
 | Every API call returns 401 | The backend's `SUPABASE_URL` must point at the same Supabase project that issued the token. Inside Docker, the backend uses `host.docker.internal` by default. |
-| Recommendations always fail with "Something went wrong" | Check the backend logs. With `AI_PROVIDER=bedrock` you need AWS credentials and model access in `AWS_REGION`. Use `AI_PROVIDER=fake` to work offline. |
+| Recommendations always fail with "Something went wrong" | Check the backend logs. With `AI_PROVIDER=anthropic` you need valid `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY`; with `bedrock`, AWS credentials and model access in `AWS_REGION`. Use `AI_PROVIDER=fake` to work offline. |
 | Images don't load | Run `make db-seed` (local) so the dev images are uploaded. The browser must reach `SUPABASE_PUBLIC_URL`. |
 | No confirmation email | Local emails go to Mailpit at http://127.0.0.1:54324. Hosted projects need SMTP configured in Supabase. |
 | Database tests are skipped | Start local Supabase (`make supabase-start db-setup`). Set `REQUIRE_DB=1` to make them fail instead. |
