@@ -9,7 +9,7 @@
 
 Build a simple web app that helps a user explore acupressure points related to a physical or mental/emotional symptom. The user describes the symptom in free text. An AI-assisted workflow interprets the description, retrieves relevant material from a curated knowledge base, and returns a shortlist of three acupressure points. Each point should have a location picture when one is available; if there is no picture, show a text description of the location instead. Application instructions are text-based.
 
-Users must have an account. The app stores symptom attempts, recommendation outcomes, and ratings so that past feedback can be used as a secondary signal when ranking later recommendations. There is no visible history page or admin interface in the MVP.
+Users must have an account. The app stores symptom attempts, recommendation outcomes, and ratings so that past feedback can be used as a secondary signal when ranking later recommendations. Users can browse their own past recommendations on a history page. There is no admin interface in the MVP.
 
 The app is an informational wellness tool. It must not claim to diagnose or replace professional medical care.
 
@@ -51,7 +51,6 @@ The app is an informational wellness tool. It must not claim to diagnose or repl
 ## 4. Out of Scope
 
 - Native mobile application.
-- User-visible recommendation history.
 - Admin interface or in-app knowledge-base editor.
 - Analytics dashboard.
 - Email address change workflow.
@@ -91,7 +90,7 @@ Deleting an account must remove the user's personal data, including original sym
 7. If suitable knowledge is found, the app displays three recommended points.
 8. Each point includes its name, a location picture if available (otherwise a text location description), and step-by-step text instructions for applying pressure. Duration and pressure guidance are shown only if the curated information includes them; the app must not invent missing values.
 9. After the user has had time to try each point, the user can submit an independent 1–5-star rating for that point.
-10. Attempts, outcomes, and per-point ratings are saved. The app does not expose a history page.
+10. Attempts, outcomes, and per-point ratings are saved. The user can review them on a history page (see §12).
 
 The feedback prompt is manual. Do not schedule reminder emails or notifications.
 
@@ -227,7 +226,12 @@ The explicit MVP decision is **general disclaimer only**, with no automated safe
 - Change password.
 - Delete account with confirmation.
 - No email change.
-- No recommendation history page.
+
+### History page
+- Lists the user's own past attempts, newest first: date, symptom text and outcome (three points, clarification needed, or no match). Failed and in-progress attempts are not shown.
+- Opening an attempt shows the three recommended points (same card as on the home page) with the user's saved rating, or the clarifying question and answer / no-match result.
+- The user can add or change a 1–5-star rating from the history detail; a new rating replaces the earlier one.
+- Only the signed-in user's own attempts are visible.
 
 ### UX and accessibility
 - Responsive on mobile and desktop.
