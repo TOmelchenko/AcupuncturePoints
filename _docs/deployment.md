@@ -4,7 +4,7 @@ The MVP runs on free tiers. The Claude API is the only usage-based cost.
 
 | Piece | Development | Production |
 |---|---|---|
-| Database, Auth, Storage | Supabase Free project `acupressure-dev` | Supabase Free project `acupressure-prod` |
+| Database, Auth, Storage | Supabase Free project `acupressure-dev` | the same project (shared; see below) |
 | Backend (FastAPI, Docker) | Render free web service `acupressure-api-dev` | Render free web service `acupressure-api-prod` |
 | Frontend (static) | Render static site `acupressure-web-dev` | Render static site `acupressure-web-prod` |
 | AI | Claude Haiku 4.5 on the Anthropic API + Voyage AI `voyage-3.5` embeddings | same |
@@ -15,6 +15,8 @@ Everything is defined in `render.yaml` (Render Blueprint) and two workflows:
 - **`.github/workflows/deploy-prod.yml`** runs manually (Actions → *Deploy to production* → Run workflow). It only accepts a commit that passed CI and was deployed to development, waits for approval on the `production` environment, then deploys and smoke-tests it.
 
 **Render gotcha:** `fromService … property: host` resolves to Render's *internal* hostname (e.g. `acupressure-api-dev`), which browsers cannot reach. That is why `render.yaml` sets the public URLs explicitly in `VITE_API_BASE_URL` and `CORS_ALLOWED_ORIGINS`. Environment changes in `render.yaml` apply only after a Blueprint sync, not on a commit deploy.
+
+**Shared Supabase project:** production currently uses the development Supabase project, so both environments share users, ratings, history and the knowledge base. `PROD_DATABASE_URL` and the prod services' Supabase settings hold the dev project's values, and the prod frontend URL is in its Auth *Redirect URLs*. To separate them later, create `acupressure-prod` (step 2), load the knowledge base there, and update those values.
 
 **Free-tier trade-offs:**
 - Free Render web services sleep after 15 minutes idle, so the first request then takes about a minute. The upgrade is $7/month per service.

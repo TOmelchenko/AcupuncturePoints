@@ -242,9 +242,9 @@ Setup steps, the release process and rollback are in [`_docs/deployment.md`](_do
 | Environment | URL |
 |---|---|
 | Development | https://acupressure-web-dev.onrender.com (API: https://acupressure-api-dev.onrender.com) |
-| Production | *added after the first deployment* |
+| Production | https://acupressure-web-prod.onrender.com (API: https://acupressure-api-prod.onrender.com) |
 
-Both environments use Claude Haiku 4.5 on the Anthropic API with Voyage AI embeddings (`AI_PROVIDER=anthropic`), because the AWS account has no Bedrock quota. The free services sleep when idle, so the first request can take about a minute.
+Both environments use Claude Haiku 4.5 on the Anthropic API with Voyage AI embeddings (`AI_PROVIDER=anthropic`), because the AWS account has no Bedrock quota. To stay within one free Supabase project, production shares the `acupressure-dev` project (database, users and Storage) with development. The free services sleep when idle, so the first request can take about a minute.
 
 ## AI-assisted development
 
