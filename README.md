@@ -12,7 +12,7 @@ Requirements live in [`_docs/specification.md`](_docs/specification.md). Work is
 - **Quality depends on the sources.** Recommendations are only as good as the curated material. The repository ships with *invented development data* (`db/seed/`), not a real knowledge base; the project owner selects the real sources.
 - **Grounding reduces but cannot remove errors.** Retrieval, schema validation and point-ID checks stop the model from inventing points, images, durations or pressure guidance. They cannot guarantee that every instruction is accurate or appropriate.
 - **No efficacy claims.** The app makes no claim that acupressure treats any condition.
-- **Personal, sparse ratings.** Only the user's own ratings count, and they only nudge the ranking (±0.05 relevance, full weight at 3 ratings of a point), so recommendations stay driven by symptom relevance.
+- **Personal, sparse ratings.** Only the user's own ratings count, and they only nudge the ranking (±0.05 relevance, full weight at 3 ratings of a point), so recommendations stay driven by symptom relevance. A point the user rated ≤2 (on average, for an overlapping symptom category) is dropped from the candidates when at least three other relevant points remain.
 - **Sensitive data.** Symptom descriptions may contain health information. They are visible only to their owner (RLS), never logged, and deleted with the account.
 
 ## Architecture
@@ -35,7 +35,7 @@ How a recommendation request works (`backend/app/recommender.py`):
 1. **Store the attempt.** The backend verifies the Supabase access token and stores the attempt with the original symptom text.
 2. **Interpret.** Claude maps the symptom to predefined categories and search terms, or asks a clarifying question.
 3. **Retrieve.** Candidates come from two sources: points curated for the matched categories, and points linked to the most similar knowledge chunks found with a `pgvector` cosine search.
-4. **Rank.** Candidates are ordered by relevance, with the user's own past ratings as a bounded tie-breaker.
+4. **Rank.** Candidates are ordered by relevance, with the user's own past ratings as a bounded tie-breaker. Points the user rated ≤2 are dropped if at least three other candidates remain.
 5. **Choose.** Claude picks three of the candidates, grounded in the retrieved excerpts.
 6. **Validate.** The backend checks there are exactly three distinct IDs, all among the candidates and all present in the database. Everything the user sees comes from the curated database records.
 7. **Persist and return.** The outcome is stored (`recommended`, `clarification_needed`, `no_match` or `failed`) and returned.

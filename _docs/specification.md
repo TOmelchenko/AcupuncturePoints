@@ -182,6 +182,7 @@ The project owner will select the specific source materials after researching su
 - The user submits feedback manually after having time to try each point.
 - Ratings are stored against the user, recommendation attempt, and specific point.
 - Historical ratings for individual points can influence ranking only as a secondary factor and only when reasonably relevant to the current symptom/category; symptom relevance remains primary.
+- When the user asks about an overlapping symptom category again, points they rated ≤2 stars on average are dropped from the candidates, but only if at least three other relevant candidates remain; otherwise they are kept so the user still gets three recommendations.
 - Do not add a dashboard, statistical reporting UI, or automatic reminders.
 - Save every attempt, including symptom descriptions, category/matching results, clarification outcomes, failures, and recommendation results where available.
 
@@ -407,7 +408,7 @@ The MVP is ready for local end-to-end verification when all of the following are
 7. An ambiguous or insufficiently matched symptom triggers a clarification flow.
 8. A symptom that remains unmatched after clarification produces a no-recommendation result rather than fabricated content.
 9. AI failure, malformed output, or unknown point IDs produce a generic error and retry option, not recommendations.
-10. Historical per-point ratings, when available, act only as a secondary ranking signal.
+10. Historical per-point ratings, when available, act only as a secondary ranking signal. Points the user rated ≤2 for an overlapping symptom category are replaced when at least three other relevant candidates remain.
 11. The main experience is responsive on desktop and mobile.
 12. Users can change their password and delete their account.
 13. Account deletion removes that user's personal symptom text, attempts, recommendation results, and ratings.

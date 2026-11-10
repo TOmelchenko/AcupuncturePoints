@@ -5,6 +5,10 @@ clearly less relevant (by more than twice that) can never overtake a more
 relevant one. Ratings are personal: only the requesting user's own ratings count,
 and only those from attempts in an overlapping symptom category. The adjustment
 starts at MIN_RATINGS and reaches full weight at FULL_WEIGHT_RATINGS.
+
+Points the user rated poorly (average <= LOW_RATING) are dropped from the
+candidates, but only when at least RECOMMENDATION_COUNT other candidates remain,
+so the user still gets a full set of recommendations.
 """
 
 import uuid
@@ -17,6 +21,8 @@ from app.retrieval import Candidate
 MAX_RATING_ADJUSTMENT = 0.05
 MIN_RATINGS = 1
 FULL_WEIGHT_RATINGS = 3
+LOW_RATING = 2.0
+RECOMMENDATION_COUNT = 3
 
 
 @dataclass(frozen=True)
@@ -33,11 +39,17 @@ def rating_adjustment(signal: RatingSignal | None) -> float:
     return MAX_RATING_ADJUSTMENT * centred * confidence
 
 
+def is_low_rated(signal: RatingSignal | None) -> bool:
+    return signal is not None and signal.count >= MIN_RATINGS and signal.average <= LOW_RATING
+
+
 def rank(candidates: list[Candidate], signals: dict[str, RatingSignal]) -> list[Candidate]:
     def score(candidate: Candidate) -> float:
         return candidate.relevance + rating_adjustment(signals.get(candidate.point.id))
 
-    return sorted(candidates, key=lambda c: (-score(c), -c.relevance, c.point.id))
+    ranked = sorted(candidates, key=lambda c: (-score(c), -c.relevance, c.point.id))
+    kept = [c for c in ranked if not is_low_rated(signals.get(c.point.id))]
+    return kept if len(kept) >= RECOMMENDATION_COUNT else ranked
 
 
 def load_rating_signals(
