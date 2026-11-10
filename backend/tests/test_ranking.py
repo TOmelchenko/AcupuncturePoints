@@ -1,7 +1,13 @@
 import pytest
 
 from app.points import PointRecord
-from app.ranking import MAX_RATING_ADJUSTMENT, RatingSignal, rank, rating_adjustment
+from app.ranking import (
+    MAX_RATING_ADJUSTMENT,
+    RatingSignal,
+    is_low_rated,
+    rank,
+    rating_adjustment,
+)
 from app.retrieval import Candidate
 
 
@@ -22,6 +28,32 @@ def test_without_ratings_order_is_by_relevance() -> None:
 def test_ratings_break_near_ties() -> None:
     signals = {"B": RatingSignal(average=5.0, count=20), "A": RatingSignal(average=1.0, count=20)}
     assert ids(rank([candidate("A", 0.80), candidate("B", 0.79)], signals)) == ["B", "A"]
+
+
+def test_low_rated_points_are_dropped_when_three_others_remain() -> None:
+    candidates = [candidate(p, 0.9) for p in ["A", "B", "C", "D"]]
+    signals = {"A": RatingSignal(average=2.0, count=1)}
+    assert ids(rank(candidates, signals)) == ["B", "C", "D"]
+
+
+def test_low_rated_points_are_kept_when_too_few_others_remain() -> None:
+    candidates = [candidate("A", 0.95), candidate("B", 0.9), candidate("C", 0.85)]
+    signals = {"A": RatingSignal(average=1.0, count=1)}
+    assert ids(rank(candidates, signals)) == ["A", "B", "C"]  # kept, only nudged
+
+
+@pytest.mark.parametrize(
+    ("signal", "low"),
+    [
+        (None, False),
+        (RatingSignal(2.0, 0), False),
+        (RatingSignal(2.0, 1), True),
+        (RatingSignal(2.5, 4), False),
+        (RatingSignal(1.0, 3), True),
+    ],
+)
+def test_is_low_rated(signal: RatingSignal | None, low: bool) -> None:
+    assert is_low_rated(signal) is low
 
 
 def test_ratings_cannot_overturn_a_clearly_more_relevant_point() -> None:
