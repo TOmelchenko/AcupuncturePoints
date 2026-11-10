@@ -48,6 +48,9 @@ How a recommendation request works (`backend/app/recommender.py`):
 | `db/` | Plain SQL setup scripts (schema, RLS, storage) and development seed data |
 | `tests/integration/` | Integration tests against a running backend and local Supabase |
 | `supabase/` | Local Supabase CLI configuration |
+| `scripts/` | Deploy helpers used by the GitHub Actions deploy workflows (`render-deploy.sh`, `smoke-test.sh`) |
+| `render.yaml` | Render Blueprint for the development and production services |
+| `acupressure-app/` | The pressure·point design prototype (Lovable); reference only, not deployed |
 | `_docs/` | Specification, process, roles, [AI-assisted workflow](_docs/ai-workflow.md) |
 
 The API is documented by FastAPI's OpenAPI: http://localhost:8000/docs (interactive) and `/openapi.json`.
@@ -97,6 +100,8 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 | `BEDROCK_TEXT_MODEL_ID` | backend, ingestion | Claude model, default `anthropic.claude-opus-5-5` |
 | `BEDROCK_EMBEDDING_MODEL_ID` | backend, ingestion | Default `amazon.titan-embed-text-v2:0`; must match the `vector(1024)` column |
 | `LOG_LEVEL` | backend | Default `INFO` |
+| `CORS_ALLOWED_ORIGINS` | backend | Comma-separated browser origins allowed to call the API when it isn't same-origin (set in `render.yaml`) |
+| `FRONTEND_HOST` | backend | Optional frontend host name; `https://<host>` is added to the allowed CORS origins |
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | frontend | Public values bundled into the browser app (RLS protects the data) |
 | `VITE_API_BASE_URL` | frontend | Backend URL; leave empty locally (Vite proxies `/api`) |
 | `COMPOSE_SUPABASE_URL`, `COMPOSE_DATABASE_URL` | Docker Compose | Override how the backend container reaches Supabase (defaults to the host's local Supabase) |
@@ -121,7 +126,7 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 
 | Layer | Where | Notes |
 |---|---|---|
-| Backend unit and API tests | `backend/tests/` | Bedrock is always mocked (`FakeAI`). Database tests in `tests/db/` run against local Supabase and are skipped when it isn't running; CI sets `REQUIRE_DB=1` so they fail instead. |
+| Backend unit and API tests | `backend/tests/` | The AI provider is always mocked (`FakeAI`). Database tests in `tests/db/` run against local Supabase and are skipped when it isn't running; CI sets `REQUIRE_DB=1` so they fail instead. |
 | Frontend component tests | `frontend/src/**/*.test.tsx` | Vitest + React Testing Library: forms, loading, clarification, no-match, error/retry, cards (image vs. text fallback, omitted guidance), ratings, account settings |
 | Ingestion tests | `ingestion/tests/` | Includes a real OCR test on a generated scanned page |
 | Integration tests | `tests/integration/` | Backend as a separate process, real Supabase Auth tokens, RLS checked through Supabase's REST API |
@@ -153,7 +158,7 @@ The schema, RLS policies and storage bucket are plain SQL scripts in `db/`, appl
 
 **Current sources:**
 - The [meine-tcm.com acupuncture point atlas](https://www.meine-tcm.com/en/atlas-of-acupuncture-points/) supplies the curated points: location, symptoms, acupressure steps, duration and pressure.
-- The WHO *Standard Acupuncture Point Locations* (`infosource/`, pages 34–241) adds location text for all 361 points.
+- The WHO *Standard Acupuncture Point Locations* (a local PDF, pages 34–241, extracted in step 2) adds location text for all 361 points.
 
 meine-tcm.com gave permission (November 2026) to use its text and point pictures in this non-commercial project, credited "Image: meine-tcm.com".
 

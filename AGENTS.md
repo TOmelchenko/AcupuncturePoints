@@ -16,7 +16,7 @@ Instructions for coding agents working in this repository.
 - `ingestion/` — Python knowledge ingestion pipeline (uv).
 - `db/` — plain SQL setup scripts (schema, RLS, storage) and development seed data.
 - `tests/integration/` — integration tests against a running backend and local Supabase.
-- Supabase (Auth, PostgreSQL, `pgvector`, Storage) and Amazon Bedrock.
+- Supabase (Auth, PostgreSQL, `pgvector`, Storage); AI via the Anthropic API + Voyage AI (deployed) or Amazon Bedrock (`AI_PROVIDER`).
 - Docker Compose for local development; common commands in the `Makefile`.
 
 ## Commands
@@ -40,7 +40,7 @@ See `README.md` for configuration, architecture and troubleshooting, and `_docs/
 - Keep it simple: no frameworks, services, abstractions or features beyond what the current issue needs.
 - Commit regularly, in small focused commits.
 - Add or update tests with every behavior change, and run them before committing.
-- Mock Amazon Bedrock in automated tests; live-provider tests must be opt-in.
+- Mock the AI provider (Anthropic/Voyage or Bedrock) in automated tests; live-provider tests must be opt-in.
 - Never commit secrets. Use environment variables; `.env.example` holds placeholders only. AWS and Supabase service-role credentials stay on the backend.
 - Treat symptom text as sensitive: do not log it, and use only invented examples in tests and fixtures.
 - Never let the model invent point IDs, images, durations or pressure guidance; recommendation details come from curated database records.

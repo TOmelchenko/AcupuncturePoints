@@ -9,7 +9,7 @@ Reviews the Developer's changes for one issue before it is closed.
 - **Spec rules:** no invented point IDs, images, durations or pressure guidance; recommendations come from curated records; failures produce a generic error with retry.
 - **Security and privacy:** no secrets committed, backend-only credentials stay on the backend, symptom text is not logged, users cannot access other users' data.
 - **Simplicity:** code is direct and readable, with no unnecessary abstraction.
-- **Tests:** new behavior is covered and Bedrock is mocked.
+- **Tests:** new behavior is covered and the AI provider is mocked.
 
 ## Output
 

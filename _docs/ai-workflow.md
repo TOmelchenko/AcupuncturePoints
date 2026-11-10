@@ -57,7 +57,7 @@ The owner can stop the loop at any time. The agent stops and asks when an issue 
 ## 4. Verification practices
 
 - **Tests prove behaviour, not just compilation.** Security tests were checked for real effect. For example, the RLS tests were run once with RLS disabled to confirm they fail, and secret detection was checked against a planted token in a throwaway clone.
-- **The AI provider is mocked everywhere.** Unit, API, integration and browser tests use a fake or demo AI, so CI is free and deterministic. A separate opt-in smoke test (`RUN_LIVE_AI=1`) checks real Bedrock.
+- **The AI provider is mocked everywhere.** Unit, API, integration and browser tests use a fake or demo AI, so CI is free and deterministic. A separate opt-in smoke test (`RUN_LIVE_AI=1`) checks the real providers (Bedrock, and the Anthropic API with Voyage AI).
 - **Real infrastructure where it matters.** Database, RLS, authentication and account deletion tests run against a local Supabase stack, in CI as well. Browser tests register a real user and confirm the email through Mailpit.
 - **Privacy is tested.** Tests assert that symptom text never reaches logs or error responses.
 - **Visual checks.** UI work was compared with the design prototype using Playwright screenshots. Issues found this way were fixed: navigation placement on mobile, and the rating selection lagging behind the click.
