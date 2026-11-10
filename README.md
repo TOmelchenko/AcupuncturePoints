@@ -144,6 +144,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every
 - Docker image builds
 - dependency audits and secret detection
 
+Each "Start local Supabase" step times out after 10 minutes (it normally takes about 1). If a runner hangs there, re-run the failed job rather than merging without it.
+
 ## Database
 
 The schema, RLS policies and storage bucket are plain SQL scripts in `db/`, applied in file-name order. There is deliberately no migration framework. All scripts are idempotent.
