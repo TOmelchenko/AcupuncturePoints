@@ -1,5 +1,11 @@
 import { supabase } from './supabase'
-import type { ErrorBody, FeedbackResponse, RecommendationResponse } from './types'
+import type {
+  ErrorBody,
+  FeedbackResponse,
+  HistoryDetail,
+  HistoryPage,
+  RecommendationResponse,
+} from './types'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const FALLBACK_MESSAGE = 'Something went wrong. Please try again.'
@@ -60,5 +66,9 @@ export const api = {
       'POST',
       { rating },
     ),
+  history: (offset: number, limit: number) =>
+    request<HistoryPage>(`/api/recommendations?limit=${limit}&offset=${offset}`, 'GET'),
+  historyItem: (attemptId: string) =>
+    request<HistoryDetail>(`/api/recommendations/${encodeURIComponent(attemptId)}`, 'GET'),
   deleteAccount: () => request<void>('/api/account', 'DELETE'),
 }

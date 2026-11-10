@@ -23,6 +23,35 @@ export interface FeedbackResponse {
   rating: number
 }
 
+export type HistoryOutcome = 'recommended' | 'clarification_needed' | 'no_match'
+
+export interface HistoryItem {
+  attempt_id: string
+  created_at: string
+  symptom: string
+  outcome: HistoryOutcome
+  points: { point_id: string; name: string; rating: number | null }[]
+}
+
+export interface HistoryPage {
+  items: HistoryItem[]
+  has_more: boolean
+}
+
+export interface RatedPoint extends RecommendedPoint {
+  rating: number | null
+}
+
+export interface HistoryDetail {
+  attempt_id: string
+  created_at: string
+  symptom: string
+  outcome: HistoryOutcome
+  clarification_question: string | null
+  clarification_answer: string | null
+  points: RatedPoint[]
+}
+
 export interface ErrorBody {
   code: string
   message: string

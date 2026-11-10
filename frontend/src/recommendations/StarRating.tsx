@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -7,16 +7,22 @@ interface Props {
   attemptId: string
   pointId: string
   pointName: string
+  /** A rating saved earlier, shown as selected. */
+  initialRating?: number | null
 }
 
 /**
  * A 1–5 star rating saved independently for one point. Built on native radio
  * inputs, so it works with Tab and the arrow keys and is announced correctly.
  */
-export function StarRating({ attemptId, pointId, pointName }: Props) {
+export function StarRating({ attemptId, pointId, pointName, initialRating }: Props) {
+  const queryClient = useQueryClient()
   const [hovered, setHovered] = useState(0)
-  const [selected, setSelected] = useState(0)
-  const save = useMutation({ mutationFn: (rating: number) => api.rate(attemptId, pointId, rating) })
+  const [selected, setSelected] = useState(initialRating ?? 0)
+  const save = useMutation({
+    mutationFn: (rating: number) => api.rate(attemptId, pointId, rating),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] }),
+  })
   const shown = hovered || selected
   const name = `rating-${attemptId}-${pointId}`
 

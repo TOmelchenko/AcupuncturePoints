@@ -4,7 +4,8 @@ import { StarRating } from './StarRating'
 
 interface Props {
   attemptId: string
-  points: RecommendedPoint[]
+  /** Points with the user's earlier rating, when known (history). */
+  points: (RecommendedPoint & { rating?: number | null })[]
 }
 
 export function RecommendationList({ attemptId, points }: Props) {
@@ -15,7 +16,14 @@ export function RecommendationList({ attemptId, points }: Props) {
           key={point.point_id}
           point={point}
           index={index}
-          footer={<StarRating attemptId={attemptId} pointId={point.point_id} pointName={point.name} />}
+          footer={
+            <StarRating
+              attemptId={attemptId}
+              pointId={point.point_id}
+              pointName={point.name}
+              initialRating={point.rating}
+            />
+          }
         />
       ))}
     </div>
