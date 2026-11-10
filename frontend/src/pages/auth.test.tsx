@@ -29,6 +29,11 @@ function withHome(page: React.ReactElement, path: string) {
 }
 
 describe('login', () => {
+  test('describes the app', () => {
+    renderWithProviders(<LoginPage />, { session: null })
+    expect(screen.getByRole('region', { name: 'About this app' })).toHaveTextContent(/acupressure self-care guide/)
+  })
+
   test('validates fields before calling Supabase', async () => {
     renderWithProviders(<LoginPage />, { session: null })
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))

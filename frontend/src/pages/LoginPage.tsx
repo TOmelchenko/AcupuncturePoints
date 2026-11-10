@@ -27,7 +27,11 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Welcome back" intro="Sign in to find acupressure points for how you feel.">
+    <AuthLayout
+      title="Welcome back"
+      intro="Sign in to find acupressure points for how you feel."
+      about="An acupressure self-care guide: tell it what's bothering you — a headache, stress, poor sleep — and it finds matching points from a curated knowledge base, showing where they are and how to press them. Use it for quick, gentle relief at home, not as medical treatment."
+    >
       <h2 className="font-display text-2xl font-medium">Sign in</h2>
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
         {error && <FormMessage kind="error">{error}</FormMessage>}
