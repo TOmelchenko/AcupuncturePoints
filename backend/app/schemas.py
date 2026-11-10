@@ -4,6 +4,7 @@ FastAPI turns these into the OpenAPI document at /docs and /openapi.json.
 """
 
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -81,6 +82,46 @@ class FeedbackResponse(BaseModel):
     attempt_id: uuid.UUID
     point_id: str
     rating: int
+
+
+# --- History -------------------------------------------------------------------
+
+HistoryOutcome = Literal["recommended", "clarification_needed", "no_match"]
+
+
+class HistoryPointSummary(BaseModel):
+    point_id: str
+    name: str
+    rating: int | None = Field(description="The user's 1–5 rating, if given.")
+
+
+class HistoryItem(BaseModel):
+    attempt_id: uuid.UUID
+    created_at: datetime
+    symptom: str = Field(description="The symptom text as the user entered it.")
+    outcome: HistoryOutcome
+    points: list[HistoryPointSummary] = Field(
+        description="The recommended points, best first; empty unless outcome is 'recommended'."
+    )
+
+
+class HistoryPage(BaseModel):
+    items: list[HistoryItem]
+    has_more: bool
+
+
+class RatedPoint(RecommendedPoint):
+    rating: int | None = Field(description="The user's 1–5 rating, if given.")
+
+
+class HistoryDetail(BaseModel):
+    attempt_id: uuid.UUID
+    created_at: datetime
+    symptom: str
+    outcome: HistoryOutcome
+    clarification_question: str | None
+    clarification_answer: str | None
+    points: list[RatedPoint] = Field(description="Empty unless outcome is 'recommended'.")
 
 
 class ErrorBody(BaseModel):

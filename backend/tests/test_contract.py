@@ -103,6 +103,17 @@ def test_endpoints_require_authentication() -> None:
         response = TestClient(app).post(path, json=body)
         assert response.status_code == 401, path
         assert response.json()["error"]["code"] == "unauthorized"
+    for path in ["/api/recommendations", f"/api/recommendations/{attempt}"]:
+        response = TestClient(app).get(path)
+        assert response.status_code == 401, path
+        assert response.json()["error"]["code"] == "unauthorized"
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=51", "offset=-1", "limit=x"])
+def test_history_paging_is_validated(client: TestClient, query: str) -> None:
+    response = client.get(f"/api/recommendations?{query}")
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
 
 
 def test_openapi_documents_the_contract() -> None:

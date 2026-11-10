@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import hand from '@/assets/hand-point.jpg'
+import { cn } from '@/lib/utils'
 import { Brand } from './Brand'
 import { Disclaimer } from './Disclaimer'
 
@@ -16,7 +17,12 @@ export function SplitLayout({ aside, nav, children }: Props) {
   return (
     <div className="relative min-h-screen bg-background font-sans text-foreground">
       <div className="grid min-h-screen lg:grid-cols-[5fr_7fr]">
-        <aside className="relative flex flex-col justify-between gap-8 bg-calm p-6 sm:p-8 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:p-12">
+        <aside
+          className={cn(
+            'relative flex flex-col justify-between gap-8 bg-calm p-6 sm:p-8 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:p-12',
+            nav && 'pt-16 sm:pt-20 lg:pt-12', // room for the nav row above the brand on small screens
+          )}
+        >
           <Brand />
           <div className="animate-rise">
             <img
@@ -31,9 +37,9 @@ export function SplitLayout({ aside, nav, children }: Props) {
           <Disclaimer />
         </aside>
         <main className="p-6 sm:p-8 lg:p-12">
-          {/* Top-right on small screens (beside the brand), top of the content column on large ones. */}
+          {/* A row above the brand on small screens, top of the content column on large ones. */}
           {nav && (
-            <nav className="absolute right-3 top-5 flex gap-1 sm:right-5 sm:top-7 lg:static lg:mb-8 lg:justify-end lg:gap-2">
+            <nav className="absolute right-3 top-3 flex gap-1 sm:right-5 sm:top-5 lg:static lg:mb-8 lg:justify-end lg:gap-2">
               {nav}
             </nav>
           )}
