@@ -286,7 +286,7 @@ Adapt the layout if implementation needs differ, but keep component responsibili
 - Supabase Auth for identity and authentication flows.
 - Supabase PostgreSQL for application and curated point data.
 - Supabase `pgvector` for retrieval embeddings.
-- Amazon Bedrock for hosted AI model access.
+- Amazon Bedrock for hosted AI model access. *Deployment decision (2026-11-10): the AWS account has no Bedrock token quota, so the deployed environments use Claude on the Anthropic API with Voyage AI embeddings (`AI_PROVIDER=anthropic`); Bedrock remains a supported provider.*
 - Python ingestion pipeline for curated source content.
 - No separate vector database.
 - No formal migration tool in the MVP; provide initial SQL setup scripts as needed.

@@ -4,9 +4,10 @@ import math
 from types import SimpleNamespace
 from typing import Any
 
+import httpx2
 import pytest
 
-from ingestion.ai import EMBEDDING_DIMENSIONS, BedrockAI, FakeAI, get_ai
+from ingestion.ai import EMBEDDING_DIMENSIONS, AnthropicAI, BedrockAI, FakeAI, get_ai
 
 
 def cosine(a: list[float], b: list[float]) -> float:
@@ -88,3 +89,45 @@ def test_bedrock_retries_throttled_calls_adaptively(bedrock: BedrockAI) -> None:
     retries = bedrock.runtime.meta.config.retries
     assert retries["mode"] == "adaptive"
     assert retries["total_max_attempts"] == 12 + 1  # first try plus retries
+
+
+@pytest.fixture
+def anthropic_ai(monkeypatch: pytest.MonkeyPatch) -> AnthropicAI:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.setenv("VOYAGE_API_KEY", "test")
+    return AnthropicAI()
+
+
+def test_anthropic_embed_retries_rate_limits_and_requests_documents(
+    anthropic_ai: AnthropicAI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("ingestion.ai.time.sleep", lambda seconds: None)
+    statuses = [429, 200]
+    bodies: list[dict[str, Any]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        bodies.append(json.loads(request.content))
+        return httpx2.Response(statuses.pop(0), json={"data": [{"embedding": [0.1] * 1024}]})
+
+    anthropic_ai.voyage = httpx2.Client(transport=httpx2.MockTransport(handler))
+
+    assert anthropic_ai.embed("some text") == [0.1] * 1024
+    assert len(bodies) == 2
+    assert bodies[0]["input_type"] == "document"
+    assert bodies[0]["output_dimension"] == 1024
+
+
+def test_anthropic_translate_uses_haiku_without_effort(anthropic_ai: AnthropicAI) -> None:
+    requests: list[dict[str, Any]] = []
+
+    def create(**kwargs: Any) -> Any:
+        requests.append(kwargs)
+        return SimpleNamespace(
+            stop_reason="end_turn", content=[SimpleNamespace(type="text", text="Hi")]
+        )
+
+    anthropic_ai.claude = SimpleNamespace(messages=SimpleNamespace(create=create))  # type: ignore[assignment]
+
+    assert anthropic_ai.translate("Hallo", "de") == "Hi"
+    assert requests[0]["model"] == "claude-haiku-4-5"
+    assert "output_config" not in requests[0]

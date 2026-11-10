@@ -1,13 +1,13 @@
 # Deployment
 
-The MVP runs on free tiers. Bedrock is the only usage-based cost.
+The MVP runs on free tiers. The Claude API is the only usage-based cost.
 
 | Piece | Development | Production |
 |---|---|---|
 | Database, Auth, Storage | Supabase Free project `acupressure-dev` | Supabase Free project `acupressure-prod` |
 | Backend (FastAPI, Docker) | Render free web service `acupressure-api-dev` | Render free web service `acupressure-api-prod` |
 | Frontend (static) | Render static site `acupressure-web-dev` | Render static site `acupressure-web-prod` |
-| AI | Amazon Bedrock: Claude Haiku 4.5 + Titan Text Embeddings V2 | same |
+| AI | Claude Haiku 4.5 on the Anthropic API + Voyage AI `voyage-3.5` embeddings | same |
 
 Everything is defined in `render.yaml` (Render Blueprint) and two workflows:
 
@@ -24,14 +24,16 @@ Everything is defined in `render.yaml` (Render Blueprint) and two workflows:
 
 Do these steps in order. Keep secret values out of chat and commits: paste them only into the AWS, Supabase, Render and GitHub dashboards, or into `gh secret set`.
 
-### 1. AWS Bedrock
+### 1. AI provider keys
 
-1. **Model access.** In the AWS console, pick a Bedrock region (e.g. `eu-central-1` or `us-east-1`) and make sure **Claude Haiku 4.5** and **Titan Text Embeddings V2** are enabled under *Model access*.
-2. **Deploy user.** Create an IAM user (or role) for the app whose only permission is `bedrock:InvokeModel` on those two models. Create an access key for it.
-3. **Check locally.** Put the key in your local `.env` (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) and run the opt-in smoke test (two small billable calls):
+The AWS account has no Bedrock token quota, so the app uses Claude on the Anthropic API and Voyage AI for embeddings (`AI_PROVIDER=anthropic`). Bedrock is still supported by the code (`AI_PROVIDER=bedrock`).
+
+1. **Anthropic.** At console.anthropic.com, add a few dollars of credit under *Billing*, then create an API key under *API Keys*.
+2. **Voyage AI.** At dash.voyageai.com, create an API key, and add a payment method: without one the rate limit is 3 requests per minute, which is too slow for ingestion. The first 200M tokens are free.
+3. **Check locally.** Put both keys in your local `.env` (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`) and run the opt-in smoke test (two small billable calls):
 
    ```sh
-   cd backend && BEDROCK_TEXT_MODEL_ID=eu.anthropic.claude-haiku-4-5-20251001-v1:0 RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live
+   cd backend && set -a && . ../.env && set +a && RUN_LIVE_AI=1 uv run pytest tests/test_ai.py -k live_anthropic
    ```
 
 ### 2. Supabase (twice: dev and prod)
@@ -58,7 +60,7 @@ Do these steps in order. Keep secret values out of chat and commits: paste them 
 ### 3. Render
 
 1. **Create the services.** Sign up at render.com with GitHub, then choose *New → Blueprint*, pick this repository, and confirm the four services from `render.yaml`.
-2. **Fill in the secrets** Render asks for: the `sync: false` values for each service, from the matching Supabase project and AWS key. The `VITE_` values are the public Project URL and anon key.
+2. **Fill in the secrets** Render asks for: the `sync: false` values for each service, from the matching Supabase project and the Anthropic and Voyage keys. The `VITE_` values are the public Project URL and anon key.
 3. **Collect the IDs.** Note each service's ID (`srv-…`, on its *Settings* page) and URL. Create an API key under *Account Settings → API Keys*.
 4. **Finish Auth.** Go back to Supabase step 2.3 and enter the frontend URLs.
 

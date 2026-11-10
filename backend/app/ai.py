@@ -1,8 +1,10 @@
-"""Amazon Bedrock access: query embeddings and structured text generation.
+"""AI access: query embeddings and structured text generation.
 
-`get_ai()` returns the real `BedrockAI` unless AI_PROVIDER=fake. Tests program a
-`FakeAI` instead, so automated tests never call AWS. Any provider failure is
-raised as `AIError`, which callers turn into a generic, retryable error.
+`get_ai()` picks the provider from AI_PROVIDER: `bedrock` (Claude and Titan on
+Amazon Bedrock), `anthropic` (Claude on the Anthropic API, embeddings from
+Voyage AI) or `fake`. Tests program a `FakeAI` instead, so automated tests never
+call a provider. Any provider failure is raised as `AIError`, which callers turn
+into a generic, retryable error.
 
 The embedding model and dimensions must match ingestion (`ingestion/ingestion/ai.py`)
 and the `vector(1024)` column.
@@ -25,6 +27,9 @@ log = logging.getLogger(__name__)
 EMBEDDING_DIMENSIONS = 1024
 DEFAULT_EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
 DEFAULT_TEXT_MODEL = "anthropic.claude-opus-5-5"
+DEFAULT_ANTHROPIC_TEXT_MODEL = "claude-haiku-4-5"
+DEFAULT_VOYAGE_EMBEDDING_MODEL = "voyage-3.5"
+VOYAGE_URL = "https://api.voyageai.com/v1/embeddings"
 REQUEST_TIMEOUT_SECONDS = 30.0
 
 T = TypeVar("T", bound=BaseModel)
@@ -73,24 +78,72 @@ class BedrockAI:
         return embedding
 
     def generate(self, system: str, prompt: str, output: type[T]) -> T:
-        import anthropic
+        return generate_with_claude(self.claude, self.text_model, system, prompt, output)
 
+
+class AnthropicAI:
+    """Claude on the Anthropic API for generation, Voyage AI for query embeddings."""
+
+    def __init__(self) -> None:
+        import anthropic
+        import httpx2
+
+        self.text_model = os.environ.get("ANTHROPIC_TEXT_MODEL_ID", DEFAULT_ANTHROPIC_TEXT_MODEL)
+        self.embedding_model = os.environ.get(
+            "VOYAGE_EMBEDDING_MODEL_ID", DEFAULT_VOYAGE_EMBEDDING_MODEL
+        )
+        self.claude = anthropic.Anthropic(timeout=REQUEST_TIMEOUT_SECONDS, max_retries=1)
+        self.voyage = httpx2.Client(
+            timeout=REQUEST_TIMEOUT_SECONDS,
+            headers={"Authorization": f"Bearer {os.environ.get('VOYAGE_API_KEY', '')}"},
+        )
+
+    def embed(self, text: str) -> list[float]:
         try:
-            response = self.claude.messages.parse(
-                model=self.text_model,
-                max_tokens=4000,
-                output_config={"effort": "low"},
-                system=system,
-                messages=[{"role": "user", "content": prompt}],
-                output_format=output,
+            response = self.voyage.post(
+                VOYAGE_URL,
+                json={
+                    "input": [text],
+                    "model": self.embedding_model,
+                    "input_type": "query",
+                    "output_dimension": EMBEDDING_DIMENSIONS,
+                },
             )
-        except (anthropic.APIError, ValidationError) as exc:
-            raise AIError(f"generation failed: {type(exc).__name__}") from exc
-        if response.stop_reason != "end_turn":
-            raise AIError(f"generation stopped early: {response.stop_reason}")
-        if response.parsed_output is None:
-            raise AIError("generation returned no structured output")
-        return response.parsed_output
+            response.raise_for_status()
+            embedding: list[float] = response.json()["data"][0]["embedding"]
+        except Exception as exc:
+            raise AIError(f"embedding failed: {type(exc).__name__}") from exc
+        if len(embedding) != EMBEDDING_DIMENSIONS:
+            raise AIError(f"embedding has {len(embedding)} dimensions")
+        return embedding
+
+    def generate(self, system: str, prompt: str, output: type[T]) -> T:
+        return generate_with_claude(self.claude, self.text_model, system, prompt, output)
+
+
+def generate_with_claude(claude: Any, model: str, system: str, prompt: str, output: type[T]) -> T:  # noqa: UP047 - T is shared with the AI protocol
+    """Structured generation shared by the Bedrock and Anthropic API clients."""
+    import anthropic
+
+    # Haiku 4.5 rejects the effort parameter; newer models use it to keep answers quick.
+    effort = {} if "haiku-4-5" in model else {"output_config": {"effort": "low"}}
+    try:
+        response = claude.messages.parse(
+            model=model,
+            max_tokens=4000,
+            system=system,
+            messages=[{"role": "user", "content": prompt}],
+            output_format=output,
+            **effort,
+        )
+    except (anthropic.APIError, ValidationError) as exc:
+        raise AIError(f"generation failed: {type(exc).__name__}") from exc
+    if response.stop_reason != "end_turn":
+        raise AIError(f"generation stopped early: {response.stop_reason}")
+    if response.parsed_output is None:
+        raise AIError("generation returned no structured output")
+    parsed: T = response.parsed_output
+    return parsed
 
 
 class FakeAI:
@@ -134,4 +187,6 @@ def get_ai() -> AI:
         return demo_ai()
     if provider == "bedrock":
         return BedrockAI()
+    if provider == "anthropic":
+        return AnthropicAI()
     raise ValueError(f"Unknown AI_PROVIDER: {provider}")

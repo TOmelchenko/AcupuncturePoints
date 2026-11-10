@@ -11,7 +11,7 @@ import httpx2
 import pytest
 from pydantic import BaseModel
 
-from app.ai import EMBEDDING_DIMENSIONS, AIError, BedrockAI, FakeAI
+from app.ai import EMBEDDING_DIMENSIONS, AIError, AnthropicAI, BedrockAI, FakeAI, get_ai
 
 
 class Answer(BaseModel):
@@ -133,7 +133,84 @@ def test_generate_failures_raise_ai_error(bedrock: BedrockAI, result: Any) -> No
         bedrock.generate("s", "p", Answer)
 
 
-# --- Opt-in live smoke test -----------------------------------------------------
+def test_generate_omits_effort_for_haiku_4_5(bedrock: BedrockAI) -> None:
+    bedrock.text_model = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+    calls = stub_claude(
+        bedrock, SimpleNamespace(stop_reason="end_turn", parsed_output=Answer(category="sleep"))
+    )
+    bedrock.generate("s", "p", Answer)
+    assert "output_config" not in calls[0]
+
+
+# --- AnthropicAI with stubbed HTTP clients --------------------------------------
+
+
+@pytest.fixture
+def anthropic_ai(monkeypatch: pytest.MonkeyPatch) -> AnthropicAI:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    monkeypatch.setenv("VOYAGE_API_KEY", "test")
+    return AnthropicAI()
+
+
+def stub_voyage(ai: AnthropicAI, status: int, embedding: list[float]) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls.append(json.loads(request.content))
+        return httpx2.Response(status, json={"data": [{"embedding": embedding}]})
+
+    ai.voyage = httpx2.Client(transport=httpx2.MockTransport(handler))
+    return calls
+
+
+def test_get_ai_selects_anthropic_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    get_ai.cache_clear()
+    try:
+        assert isinstance(get_ai(), AnthropicAI)
+    finally:
+        get_ai.cache_clear()
+
+
+def test_anthropic_embed_requests_voyage_query_with_1024_dimensions(
+    anthropic_ai: AnthropicAI,
+) -> None:
+    calls = stub_voyage(anthropic_ai, 200, [0.5] * EMBEDDING_DIMENSIONS)
+    assert anthropic_ai.embed("sore neck") == [0.5] * EMBEDDING_DIMENSIONS
+    assert calls[0] == {
+        "input": ["sore neck"],
+        "model": "voyage-3.5",
+        "input_type": "query",
+        "output_dimension": 1024,
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "embedding"), [(429, [0.5] * 1024), (200, [0.1] * 10)], ids=["http", "dims"]
+)
+def test_anthropic_embed_failures_raise_ai_error(
+    anthropic_ai: AnthropicAI, status: int, embedding: list[float]
+) -> None:
+    stub_voyage(anthropic_ai, status, embedding)
+    with pytest.raises(AIError):
+        anthropic_ai.embed("sore neck")
+
+
+def test_anthropic_generate_uses_haiku_without_effort(anthropic_ai: AnthropicAI) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def parse(**kwargs: Any) -> Any:
+        calls.append(kwargs)
+        return SimpleNamespace(stop_reason="end_turn", parsed_output=Answer(category="sleep"))
+
+    anthropic_ai.claude = SimpleNamespace(messages=SimpleNamespace(parse=parse))  # type: ignore[assignment]
+    assert anthropic_ai.generate("s", "cannot sleep", Answer) == Answer(category="sleep")
+    assert calls[0]["model"] == "claude-haiku-4-5"
+    assert "output_config" not in calls[0]
+
+
+# --- Opt-in live smoke tests -----------------------------------------------------
 
 
 @pytest.mark.skipif(
@@ -141,6 +218,18 @@ def test_generate_failures_raise_ai_error(bedrock: BedrockAI, result: Any) -> No
 )
 def test_live_bedrock_smoke() -> None:
     ai = BedrockAI()
+    assert len(ai.embed("tension headache")) == EMBEDDING_DIMENSIONS
+    answer = ai.generate(
+        "Classify the symptom.", "Category for 'my head hurts'? Use 'headache'.", Answer
+    )
+    assert answer.category
+
+
+@pytest.mark.skipif(
+    os.environ.get("RUN_LIVE_AI") != "1", reason="set RUN_LIVE_AI=1 to call Anthropic and Voyage"
+)
+def test_live_anthropic_smoke() -> None:
+    ai = AnthropicAI()
     assert len(ai.embed("tension headache")) == EMBEDDING_DIMENSIONS
     answer = ai.generate(
         "Classify the symptom.", "Category for 'my head hurts'? Use 'headache'.", Answer

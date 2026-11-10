@@ -23,7 +23,7 @@ flowchart LR
   Browser -- "REST /api + access token" --> API["Backend<br/>FastAPI"]
   API -- "verify JWT (JWKS)" --> Auth
   API -- "SQL + pgvector" --> DB[("Supabase Postgres<br/>pgvector, RLS")]
-  API -- "embeddings + structured generation" --> Bedrock["Amazon Bedrock<br/>Claude, Titan Embeddings"]
+  API -- "embeddings + structured generation" --> Bedrock["Claude API + Voyage AI<br/>(or Amazon Bedrock)"]
   Browser -- "point images" --> Storage["Supabase Storage"]
   Ingest["Ingestion pipeline<br/>Python"] --> DB
   Ingest --> Storage
@@ -65,8 +65,9 @@ make db-seed          # invented development data (local only)
 ```
 
 Choose the AI provider in `.env`:
-- **Offline demo:** `AI_PROVIDER=fake` uses keyword-matching stand-in answers, with no AWS needed.
-- **Real AI:** `AI_PROVIDER=bedrock` uses AWS credentials and Bedrock model access in `AWS_REGION`.
+- **Offline demo:** `AI_PROVIDER=fake` uses keyword-matching stand-in answers, with no API keys needed.
+- **Real AI (deployed setup):** `AI_PROVIDER=anthropic` uses Claude Haiku 4.5 on the Anthropic API (`ANTHROPIC_API_KEY`) and Voyage AI embeddings (`VOYAGE_API_KEY`).
+- **Real AI on AWS:** `AI_PROVIDER=bedrock` uses AWS credentials and Bedrock model access in `AWS_REGION`.
 
 Then start the app:
 
@@ -88,7 +89,10 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 | `SUPABASE_PUBLIC_URL` | backend | Browser-facing Supabase URL for Storage image links (defaults to `SUPABASE_URL`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | backend, ingestion | Privileged key for deleting Auth users and uploading images. **Backend only.** |
 | `DATABASE_URL` | backend, ingestion, `make db-*` | Postgres connection string (privileged; the backend scopes private data to the user) |
-| `AI_PROVIDER` | backend, ingestion | `bedrock` (default) or `fake` (offline demo; never production) |
+| `AI_PROVIDER` | backend, ingestion | `anthropic`, `bedrock` (default) or `fake` (offline demo; never production) |
+| `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY` | backend, ingestion | Anthropic API and Voyage AI keys (with `AI_PROVIDER=anthropic`) |
+| `ANTHROPIC_TEXT_MODEL_ID` | backend, ingestion | Claude model, default `claude-haiku-4-5` |
+| `VOYAGE_EMBEDDING_MODEL_ID` | backend, ingestion | Default `voyage-3.5` (1024 dimensions); must match the `vector(1024)` column |
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | backend, ingestion | Bedrock access (or any standard AWS credential source) |
 | `BEDROCK_TEXT_MODEL_ID` | backend, ingestion | Claude model, default `anthropic.claude-opus-5-5` |
 | `BEDROCK_EMBEDDING_MODEL_ID` | backend, ingestion | Default `amazon.titan-embed-text-v2:0`; must match the `vector(1024)` column |
@@ -122,7 +126,7 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 | Ingestion tests | `ingestion/tests/` | Includes a real OCR test on a generated scanned page |
 | Integration tests | `tests/integration/` | Backend as a separate process, real Supabase Auth tokens, RLS checked through Supabase's REST API |
 | Browser tests | `frontend/e2e/` | Playwright, desktop and mobile. Registration with a real confirmation email from Mailpit. |
-| Live AI smoke test | `backend/tests/test_ai.py` | Opt-in only (`RUN_LIVE_AI=1`). Makes two small billable Bedrock calls. |
+| Live AI smoke test | `backend/tests/test_ai.py` | Opt-in only (`RUN_LIVE_AI=1`). Makes small billable Bedrock and Anthropic/Voyage calls. |
 
 The demo AI understands two markers for exercising failure paths: a symptom containing `[demo:fail]` makes the AI call fail, and `[demo:invalid-id]` makes the model return a point ID that doesn't exist.
 
@@ -227,7 +231,7 @@ meine-tcm.com gave permission (November 2026) to use its text and point pictures
 
 ## Deployment
 
-The MVP deploys to free tiers: **Supabase Free** for the database, Auth and Storage, and **Render** for the backend (Docker web service) and frontend (static site), in separate development and production environments. Amazon Bedrock runs Claude Haiku 4.5 in the deployed environments. All of this is defined in `render.yaml`.
+The MVP deploys to free tiers: **Supabase Free** for the database, Auth and Storage, and **Render** for the backend (Docker web service) and frontend (static site), in separate development and production environments. Claude Haiku 4.5 on the Anthropic API, with Voyage AI embeddings, runs in the deployed environments. All of this is defined in `render.yaml`.
 
 - **Development:** deploys automatically after CI passes on `main` (`.github/workflows/deploy-dev.yml`).
 - **Production:** deploys manually with approval, and only a commit already verified in development can go (`.github/workflows/deploy-prod.yml`).
@@ -240,7 +244,7 @@ Setup steps, the release process and rollback are in [`_docs/deployment.md`](_do
 | Development | https://acupressure-web-dev.onrender.com (API: https://acupressure-api-dev.onrender.com) |
 | Production | *added after the first deployment* |
 
-Development currently runs the offline demo AI (`AI_PROVIDER=fake`) with fake embeddings, until the AWS Bedrock quota is raised; recommendations there come from simple keyword matching, so try symptoms such as "headache" or "neck and shoulder pain". The free services sleep when idle, so the first request can take about a minute.
+Both environments use Claude Haiku 4.5 on the Anthropic API with Voyage AI embeddings (`AI_PROVIDER=anthropic`), because the AWS account has no Bedrock quota. The free services sleep when idle, so the first request can take about a minute.
 
 ## AI-assisted development
 
