@@ -42,7 +42,9 @@ The AWS account has no Bedrock token quota, so the app uses Claude on the Anthro
 
 1. **Create the project** at supabase.com: a Free plan project named `acupressure-dev` (later `acupressure-prod`), region Frankfurt.
 2. **Collect the settings** from *Project Settings → API*: the **Project URL**, **anon key** and **service_role key**. From *Connect*, take the **Session pooler** connection string; it supports IPv4, which Render and GitHub runners need.
-3. **Configure Auth.** Under *Authentication → URL Configuration*, set **Site URL** to the frontend URL (filled in after step 3, e.g. `https://acupressure-web-dev.onrender.com`) and add `<frontend URL>/**` to **Redirect URLs**. Keep *Confirm email* on.
+3. **Configure Auth.** Under *Authentication → URL Configuration*, set **Site URL** to the frontend URL (filled in after step 3, e.g. `https://acupressure-web-dev.onrender.com`) and add `<frontend URL>/**` to **Redirect URLs**. Keep *Confirm email* on. Under *Sign In / Providers → Email*, set **Minimum password length** to 8, matching the frontend and `supabase/config.toml`.
+
+   **Email limit:** the project uses Supabase's built-in email service, so confirmation and reset emails come from Supabase's no-reply address and are limited to about 2 per hour across all users. Above that, registration and password reset show "Too many emails were requested. Please try again in an hour." To lift the limit, set up an SMTP provider under *Authentication → Emails → SMTP Settings* (the sender address is visible to users), then raise the email limit under *Authentication → Rate Limits*.
 4. **Apply the schema** from your machine:
 
    ```sh

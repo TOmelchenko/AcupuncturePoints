@@ -26,7 +26,15 @@ export type RegisterValues = z.infer<typeof registerSchema>
 export type NewPasswordValues = z.infer<typeof newPasswordSchema>
 export type EmailValues = z.infer<typeof emailSchema>
 
-/** Supabase Auth messages are short and user-facing; fall back for anything unexpected. */
-export function authErrorMessage(error: { message?: string } | null | undefined): string {
+const EMAIL_LIMIT_MESSAGE = 'Too many emails were requested. Please try again in an hour.'
+
+/**
+ * Supabase Auth messages are short and user-facing; fall back for anything unexpected.
+ * The hourly email limit of the built-in email service gets a clearer message.
+ */
+export function authErrorMessage(error: { message?: string; code?: string } | null | undefined): string {
+  if (error?.code === 'over_email_send_rate_limit' || /email rate limit exceeded/i.test(error?.message ?? '')) {
+    return EMAIL_LIMIT_MESSAGE
+  }
   return error?.message || 'Something went wrong. Please try again.'
 }

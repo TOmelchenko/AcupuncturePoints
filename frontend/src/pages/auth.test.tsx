@@ -113,6 +113,18 @@ describe('password reset', () => {
     })
   })
 
+  test.each([
+    { code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' },
+    { message: 'Email rate limit exceeded' },
+  ])('explains the hourly email limit instead of showing the raw error: %o', async (error) => {
+    auth.resetPasswordForEmail.mockResolvedValue({ error })
+    renderWithProviders(<ForgotPasswordPage />, { session: null })
+    await userEvent.type(screen.getByLabelText('Email'), 'user@example.test')
+    await userEvent.click(screen.getByRole('button', { name: 'Send reset link' }))
+    expect(await screen.findByText('Too many emails were requested. Please try again in an hour.')).toBeInTheDocument()
+    expect(screen.queryByText(/rate limit/i)).not.toBeInTheDocument()
+  })
+
   test('the reset link page saves a new password', async () => {
     auth.updateUser.mockResolvedValue({ error: null })
     renderWithProviders(withHome(<ResetPasswordPage />, '/reset-password'), { route: '/reset-password' })
