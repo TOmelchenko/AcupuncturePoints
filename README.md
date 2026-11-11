@@ -2,6 +2,8 @@
 
 A responsive web app that helps people explore acupressure points for a physical or mental/emotional symptom. The user describes the symptom in their own words. An AI-assisted workflow interprets it, retrieves curated knowledge, and returns three acupressure points with a location picture (or a text description), step-by-step instructions, and duration/pressure guidance where the curated source provides it. Users rate each point after trying it, and their own ratings act as a secondary ranking signal in their later recommendations.
 
+**Try it live: https://acupressure-web-prod.onrender.com** — sign up with an email address and confirm it to start. The free hosting sleeps when idle, so the first load can take about a minute. See [Deployment](#deployment) for details.
+
 Requirements live in [`_docs/specification.md`](_docs/specification.md). Work is tracked as [GitHub issues](https://github.com/TOmelchenko/AcupuncturePoints/issues).
 
 > **Medical disclaimer.** This app provides general wellness information only. It does not diagnose, it is not an emergency or treatment service, and it does not replace professional medical care. Stop any technique that causes pain or discomfort, and seek professional advice if you are concerned about a symptom.
