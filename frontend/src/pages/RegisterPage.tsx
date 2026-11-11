@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, Navigate } from 'react-router'
 import { useAuth } from '@/auth/context'
-import { authErrorMessage, registerSchema, type RegisterValues } from '@/auth/schemas'
+import { authErrorMessage, PASSWORD_HINT, registerSchema, type RegisterValues } from '@/auth/schemas'
 import { FormField } from '@/components/FormField'
 import { FormMessage } from '@/components/FormMessage'
 import { Button } from '@/components/ui/button'
@@ -44,7 +44,7 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
             {error && <FormMessage kind="error">{error}</FormMessage>}
             <FormField id="email" label="Email" type="email" autoComplete="email" error={formState.errors.email?.message} {...register('email')} />
-            <FormField id="password" label="Password" type="password" autoComplete="new-password" error={formState.errors.password?.message} {...register('password')} />
+            <FormField id="password" label="Password" type="password" autoComplete="new-password" hint={PASSWORD_HINT} error={formState.errors.password?.message} {...register('password')} />
             <FormField id="confirm" label="Confirm password" type="password" autoComplete="new-password" error={formState.errors.confirm?.message} {...register('confirm')} />
             <Button type="submit" disabled={formState.isSubmitting} className="h-11 w-full rounded-full">
               {formState.isSubmitting ? 'Creating account…' : 'Create account'}

@@ -3,6 +3,9 @@ import { z } from 'zod'
 const email = z.string().trim().min(1, 'Enter your email address.').pipe(z.email('Enter a valid email address.'))
 const password = z.string().min(8, 'Use at least 8 characters.')
 
+/** Shown under every field where a password is chosen; Supabase Auth enforces the same minimum. */
+export const PASSWORD_HINT = 'At least 8 characters.'
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, 'Enter your password.'),

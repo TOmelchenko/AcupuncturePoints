@@ -64,6 +64,17 @@ describe('login', () => {
 })
 
 describe('register', () => {
+  test('tells the user the password rule before they type', async () => {
+    renderWithProviders(<RegisterPage />, { session: null })
+    expect(screen.getByLabelText('Password')).toHaveAccessibleDescription('At least 8 characters.')
+    await userEvent.type(screen.getByLabelText('Password'), 'short')
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByText('Use at least 8 characters.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toHaveAccessibleDescription(
+      'At least 8 characters. Use at least 8 characters.',
+    )
+  })
+
   test('requires matching passwords of at least 8 characters', async () => {
     renderWithProviders(<RegisterPage />, { session: null })
     await userEvent.type(screen.getByLabelText('Email'), 'not-an-email')
