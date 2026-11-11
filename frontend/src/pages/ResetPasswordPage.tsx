@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/context'
-import { authErrorMessage, newPasswordSchema, type NewPasswordValues } from '@/auth/schemas'
+import { authErrorMessage, newPasswordSchema, PASSWORD_HINT, type NewPasswordValues } from '@/auth/schemas'
 import { FormField } from '@/components/FormField'
 import { FormMessage } from '@/components/FormMessage'
 import { Button } from '@/components/ui/button'
@@ -37,7 +37,7 @@ export function ResetPasswordPage() {
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
           {error && <FormMessage kind="error">{error}</FormMessage>}
-          <FormField id="password" label="New password" type="password" autoComplete="new-password" error={formState.errors.password?.message} {...register('password')} />
+          <FormField id="password" label="New password" type="password" autoComplete="new-password" hint={PASSWORD_HINT} error={formState.errors.password?.message} {...register('password')} />
           <FormField id="confirm" label="Confirm new password" type="password" autoComplete="new-password" error={formState.errors.confirm?.message} {...register('confirm')} />
           <Button type="submit" disabled={formState.isSubmitting} className="h-11 w-full rounded-full">
             {formState.isSubmitting ? 'Saving…' : 'Save new password'}
