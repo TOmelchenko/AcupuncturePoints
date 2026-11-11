@@ -134,6 +134,7 @@ dependencies = [
     { name = "anthropic", extra = ["bedrock"] },
     { name = "boto3" },
     { name = "fastapi" },
+    { name = "httpx2" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "pyjwt", extra = ["crypto"] },
@@ -142,7 +143,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx2" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -153,6 +153,7 @@ requires-dist = [
     { name = "anthropic", extras = ["bedrock"], specifier = ">=2.6.0" },
     { name = "boto3", specifier = ">=1.43.126" },
     { name = "fastapi", specifier = ">=0.162.2" },
+    { name = "httpx2", specifier = ">=2.16.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.8" },
     { name = "psycopg-pool", specifier = ">=3.3.3" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.15.1" },
@@ -161,7 +162,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx2", specifier = ">=2.16.0" },
     { name = "mypy", specifier = ">=2.4.1" },
     { name = "pytest", specifier = ">=9.2.0" },
     { name = "ruff", specifier = ">=0.17.4" },
