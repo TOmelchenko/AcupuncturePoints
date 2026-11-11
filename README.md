@@ -233,7 +233,7 @@ meine-tcm.com gave permission (November 2026) to use its text and point pictures
 | Every API call returns 401 | The backend's `SUPABASE_URL` must point at the same Supabase project that issued the token. Inside Docker, the backend uses `host.docker.internal` by default. |
 | Recommendations always fail with "Something went wrong" | Check the backend logs. With `AI_PROVIDER=anthropic` you need valid `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY`; with `bedrock`, AWS credentials and model access in `AWS_REGION`. Use `AI_PROVIDER=fake` to work offline. |
 | Images don't load | Run `make db-seed` (local) so the dev images are uploaded. The browser must reach `SUPABASE_PUBLIC_URL`. |
-| No confirmation email | Local emails go to Mailpit at http://127.0.0.1:54324. Hosted projects need SMTP configured in Supabase. |
+| No confirmation or reset email | Local emails go to Mailpit at http://127.0.0.1:54324. The hosted project uses Supabase's built-in email service, which sends about 2 emails per hour across all users; above that the app shows "Too many emails were requested". Wait an hour, or configure custom SMTP in Supabase (see `_docs/deployment.md`). |
 | Database tests are skipped | Start local Supabase (`make supabase-start db-setup`). Set `REQUIRE_DB=1` to make them fail instead. |
 | `make db-seed` refuses to run | It only runs against a local `DATABASE_URL`, by design. |
 
