@@ -99,6 +99,17 @@ describe('register', () => {
       expect.objectContaining({ email: 'new@example.test', password: 'long-enough' }),
     )
   })
+
+  test('says the email is already registered instead of promising a confirmation email', async () => {
+    auth.signUp.mockResolvedValue({ data: { user: { identities: [] }, session: null }, error: null })
+    renderWithProviders(<RegisterPage />, { session: null })
+    await userEvent.type(screen.getByLabelText('Email'), 'known@example.test')
+    await userEvent.type(screen.getByLabelText('Password'), 'long-enough')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'long-enough')
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('An account with this email already exists')
+    expect(screen.queryByText(/Check your email/)).not.toBeInTheDocument()
+  })
 })
 
 describe('password reset', () => {

@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { AuthLayout } from './AuthLayout'
 
+const ALREADY_REGISTERED_MESSAGE =
+  'An account with this email already exists. Sign in, or reset your password if you forgot it.'
+
 export function RegisterPage() {
   const { session } = useAuth()
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +29,8 @@ export function RegisterPage() {
       options: { emailRedirectTo: `${window.location.origin}/` },
     })
     if (error) setError(authErrorMessage(error))
+    // With email confirmation on, Supabase answers a known email with a user that has no identities instead of an error.
+    else if (data.user?.identities?.length === 0) setError(ALREADY_REGISTERED_MESSAGE)
     else if (!data.session) setCheckEmail(true) // email confirmation required
   }
 
