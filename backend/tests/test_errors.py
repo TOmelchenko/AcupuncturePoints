@@ -2,9 +2,10 @@ import logging
 
 import pytest
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-from app.errors import EXCEPTION_HANDLERS
+from app.errors import install_error_handling
 from app.main import app as main_app
 
 SECRET = "invented symptom text that must stay private"
@@ -12,8 +13,7 @@ SECRET = "invented symptom text that must stay private"
 
 def make_app() -> FastAPI:
     app = FastAPI()
-    for exception_class, handler in EXCEPTION_HANDLERS.items():
-        app.add_exception_handler(exception_class, handler)
+    install_error_handling(app)
 
     @app.get("/boom")
     def boom() -> None:
@@ -26,7 +26,9 @@ def test_unexpected_exception_returns_generic_error_without_details(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.ERROR)
-    response = TestClient(make_app(), raise_server_exceptions=False).get("/boom")
+    # The default TestClient re-raises anything the app lets through to the server (which
+    # would log the message), so getting a response shows the exception was fully handled.
+    response = TestClient(make_app()).get("/boom")
 
     assert response.status_code == 500
     assert response.json() == {
@@ -42,6 +44,14 @@ def test_unexpected_exception_returns_generic_error_without_details(
     assert "unhandled RuntimeError on GET /boom" in caplog.text
     assert "test_errors.py" in caplog.text
     assert SECRET not in caplog.text
+
+
+def test_cors_headers_are_added_to_unexpected_errors() -> None:
+    app = make_app()
+    app.add_middleware(CORSMiddleware, allow_origins=["https://app.example.test"])
+    response = TestClient(app).get("/boom", headers={"Origin": "https://app.example.test"})
+    assert response.status_code == 500
+    assert response.headers["access-control-allow-origin"] == "https://app.example.test"
 
 
 def test_unknown_route_uses_common_shape() -> None:
