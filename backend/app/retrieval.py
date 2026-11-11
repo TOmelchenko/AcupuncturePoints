@@ -4,9 +4,14 @@ Two signals find candidates:
 * category match — points curated for the interpreted categories (relevance 1.0);
 * similar knowledge — points linked to the chunks most similar to the search terms
   (relevance = cosine similarity).
-A point found by both gets a small bonus. Fewer than three candidates above the
+A point found by both gets a small bonus. Candidates with equal relevance (every
+category match scores the same) are ordered by how similar their own knowledge
+is to the search terms, so the same points do not always win. Fewer than three candidates above the
 threshold means the match is insufficient: the caller asks for clarification or
 reports no match instead of padding the list with weak points.
+
+The caller embeds the search terms first (`embed_query`), so no database
+connection is held during that AI call.
 """
 
 from dataclasses import dataclass, field
@@ -39,6 +44,7 @@ class Candidate:
     point: PointRecord
     relevance: float
     category_ids: list[str] = field(default_factory=list)
+    similarity: float = 0.0  # best similarity of the point's own chunks; breaks relevance ties
 
 
 @dataclass(frozen=True)
@@ -74,8 +80,28 @@ def category_points(conn: psycopg.Connection, category_ids: list[str]) -> dict[s
     return {row[0]: row[1] for row in rows}
 
 
-def retrieve(conn: psycopg.Connection, ai: AI, interpretation: Interpretation) -> RetrievalResult:
-    chunks = search_chunks(conn, ai.embed(" ".join(interpretation.search_terms)), CHUNK_LIMIT)
+def point_similarity(
+    conn: psycopg.Connection, embedding: list[float], point_ids: list[str]
+) -> dict[str, float]:
+    """Point id -> similarity of its most similar chunk (absent if it has no chunks)."""
+    if not point_ids:
+        return {}
+    rows = conn.execute(
+        "select point_id, max(1 - (embedding <=> %(e)s::extensions.vector)) "
+        "from knowledge_chunks where point_id = any(%(ids)s) group by point_id",
+        {"e": str(embedding), "ids": point_ids},
+    ).fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
+def embed_query(ai: AI, interpretation: Interpretation) -> list[float]:
+    return ai.embed(" ".join(interpretation.search_terms))
+
+
+def retrieve(
+    conn: psycopg.Connection, embedding: list[float], interpretation: Interpretation
+) -> RetrievalResult:
+    chunks = search_chunks(conn, embedding, CHUNK_LIMIT)
     by_category = category_points(conn, interpretation.category_ids)
 
     best_similarity: dict[str, float] = {}
@@ -97,9 +123,12 @@ def retrieve(conn: psycopg.Connection, ai: AI, interpretation: Interpretation) -
             relevance[point_id] = round(score, 4)
 
     points = get_points(conn, list(relevance))
+    similarity = point_similarity(conn, embedding, list(relevance))
     candidates = [
-        Candidate(points[pid], relevance[pid], by_category.get(pid, []))
-        for pid in sorted(relevance, key=lambda pid: (-relevance[pid], pid))
+        Candidate(points[pid], relevance[pid], by_category.get(pid, []), similarity.get(pid, 0.0))
+        for pid in sorted(
+            relevance, key=lambda pid: (-relevance[pid], -similarity.get(pid, 0.0), pid)
+        )
         if pid in points
     ]
     return RetrievalResult(chunks=chunks, candidates=candidates)

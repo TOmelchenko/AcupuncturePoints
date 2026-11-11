@@ -10,6 +10,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.auth import CurrentUser, get_current_user
 from app.main import app
 from app.schemas import (
+    ClarificationRequest,
     FeedbackRequest,
     RecommendationRequest,
     RecommendationResponse,
@@ -37,6 +38,14 @@ def test_symptom_is_stripped_and_length_checked() -> None:
     for bad in ["", "  a ", "x" * 1001]:
         with pytest.raises(ValidationError):
             RecommendationRequest(symptom=bad)
+
+
+def test_nul_characters_are_rejected() -> None:
+    with pytest.raises(ValidationError):
+        RecommendationRequest(symptom="sore\x00neck")
+    with pytest.raises(ValidationError):
+        ClarificationRequest(answer="left\x00side")
+    assert RecommendationRequest(symptom="sore neck\nsince Monday").symptom.count("\n") == 1
 
 
 def test_unknown_request_fields_are_rejected() -> None:

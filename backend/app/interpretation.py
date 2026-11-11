@@ -39,16 +39,21 @@ class Interpretation(BaseModel):
     clarification_question: str | None = None
 
 
+def escape_tags(text: str) -> str:
+    """Keep user text from closing the <symptom>/<answer> tags it is wrapped in."""
+    return text.replace("<", "&lt;").replace(">", "&gt;")
+
+
 def build_prompt(
     symptom: str, categories: list[Category], clarification: tuple[str, str] | None
 ) -> str:
     listed = json.dumps(
         [{"id": c.id, "name": c.name, "description": c.description} for c in categories]
     )
-    prompt = f"Categories: {listed}\n\n<symptom>{symptom}</symptom>"
+    prompt = f"Categories: {listed}\n\n<symptom>{escape_tags(symptom)}</symptom>"
     if clarification:
         question, answer = clarification
-        prompt += f"\n\nYou asked: {question}\n<answer>{answer}</answer>"
+        prompt += f"\n\nYou asked: {question}\n<answer>{escape_tags(answer)}</answer>"
         prompt += "\nUse the answer to decide. Do not ask another question."
     return prompt
 

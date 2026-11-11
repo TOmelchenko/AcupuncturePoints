@@ -11,13 +11,26 @@ from app.ranking import (
 from app.retrieval import Candidate
 
 
-def candidate(point_id: str, relevance: float) -> Candidate:
+def candidate(point_id: str, relevance: float, similarity: float = 0.0) -> Candidate:
     point = PointRecord(point_id, point_id, "here", None, None, None, ["press"], None, None)
-    return Candidate(point, relevance)
+    return Candidate(point, relevance, similarity=similarity)
 
 
 def ids(candidates: list[Candidate]) -> list[str]:
     return [c.point.id for c in candidates]
+
+
+def test_equal_relevance_is_ordered_by_similarity_then_id() -> None:
+    result = rank(
+        [
+            candidate("A", 1.0),
+            candidate("B", 1.0, 0.2),
+            candidate("C", 1.0, 0.6),
+            candidate("D", 1.0),
+        ],
+        {},
+    )
+    assert ids(result) == ["C", "B", "A", "D"]
 
 
 def test_without_ratings_order_is_by_relevance() -> None:

@@ -1,4 +1,5 @@
 """Rank candidate points: symptom relevance first, past ratings only as a tie-breaker.
+Remaining ties go to the point whose knowledge is most similar to the search terms.
 
 The rating adjustment is bounded to ±MAX_RATING_ADJUSTMENT, so a point that is
 clearly less relevant (by more than twice that) can never overtake a more
@@ -47,7 +48,7 @@ def rank(candidates: list[Candidate], signals: dict[str, RatingSignal]) -> list[
     def score(candidate: Candidate) -> float:
         return candidate.relevance + rating_adjustment(signals.get(candidate.point.id))
 
-    ranked = sorted(candidates, key=lambda c: (-score(c), -c.relevance, c.point.id))
+    ranked = sorted(candidates, key=lambda c: (-score(c), -c.relevance, -c.similarity, c.point.id))
     kept = [c for c in ranked if not is_low_rated(signals.get(c.point.id))]
     return kept if len(kept) >= RECOMMENDATION_COUNT else ranked
 

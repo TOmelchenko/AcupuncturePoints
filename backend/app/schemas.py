@@ -9,10 +9,14 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+# psycopg rejects NUL characters, so they are refused here (422) rather than failing on insert.
+NO_NUL = r"^[^\x00]*$"
 SymptomText = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=3, max_length=1000)
+    str, StringConstraints(strip_whitespace=True, min_length=3, max_length=1000, pattern=NO_NUL)
 ]
-AnswerText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+AnswerText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000, pattern=NO_NUL)
+]
 
 
 class StrictModel(BaseModel):
@@ -130,6 +134,7 @@ class ErrorBody(BaseModel):
         "validation_error",
         "not_found",
         "recommendation_failed",
+        "rate_limited",
         "not_implemented",
         "internal_error",
     ]

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.ai import AI, get_ai
 from app.auth import CurrentUser, get_current_user
-from app.db import get_db
+from app.db import Connect, get_connect, get_db
 from app.errors import error_responses
 from app.feedback import save_rating
 from app.history import get_history_detail, list_history
@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 
 User = Annotated[CurrentUser, Depends(get_current_user)]
 Db = Annotated[psycopg.Connection, Depends(get_db)]
+DbConnect = Annotated[Connect, Depends(get_connect)]
 Ai = Annotated[AI, Depends(get_ai)]
 
 
@@ -61,13 +62,14 @@ def get_history_item(attempt_id: uuid.UUID, user: User, db: Db) -> HistoryDetail
     response_model=RecommendationResponse,
     summary="Submit a symptom",
     description="Returns three recommended points, a clarifying question, or a no-match result. "
-    "Technical or AI failures return 502 `recommendation_failed` with `retryable: true`.",
-    responses=error_responses(401, 422, 502),
+    "Technical or AI failures return 502 `recommendation_failed` with `retryable: true`. "
+    "Too many attempts within an hour return 429 `rate_limited`.",
+    responses=error_responses(401, 422, 429, 502),
 )
 def create_recommendation(
-    body: RecommendationRequest, user: User, db: Db, ai: Ai
+    body: RecommendationRequest, user: User, connect: DbConnect, ai: Ai
 ) -> RecommendationResponse:
-    return Recommender(db, ai).start(user.id, body.symptom)
+    return Recommender(connect, ai).start(user.id, body.symptom)
 
 
 @router.post(
@@ -79,9 +81,9 @@ def create_recommendation(
     responses=error_responses(401, 404, 422, 502),
 )
 def answer_clarification(
-    attempt_id: uuid.UUID, body: ClarificationRequest, user: User, db: Db, ai: Ai
+    attempt_id: uuid.UUID, body: ClarificationRequest, user: User, connect: DbConnect, ai: Ai
 ) -> RecommendationResponse:
-    return Recommender(db, ai).clarify(user.id, attempt_id, body.answer)
+    return Recommender(connect, ai).clarify(user.id, attempt_id, body.answer)
 
 
 @router.post(

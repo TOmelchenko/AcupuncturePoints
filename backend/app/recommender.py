@@ -10,6 +10,11 @@
 A weak match first leads to a clarifying question; after the user has answered,
 a weak match is reported as no match. Any AI or technical failure is stored as
 `failed` and returned as a generic, retryable error. Raw symptom text is never logged.
+
+Each database step takes a pooled connection for one short transaction, so no
+connection is held while waiting for the AI provider. An attempt is `pending`
+while it is being worked on; answering a clarification claims the attempt
+atomically, so a concurrent duplicate answer gets a 404 instead of corrupting it.
 """
 
 import json
@@ -20,10 +25,17 @@ import psycopg
 
 from app.ai import AI, AIError
 from app.config import get_settings
+from app.db import Connect
 from app.errors import ApiError
-from app.interpretation import DEFAULT_QUESTION, Category, Interpretation, interpret
+from app.interpretation import (
+    DEFAULT_QUESTION,
+    Category,
+    Interpretation,
+    escape_tags,
+    interpret,
+)
 from app.ranking import load_rating_signals, rank
-from app.retrieval import RetrievalResult, retrieve
+from app.retrieval import RetrievalResult, embed_query, retrieve
 from app.schemas import ClarificationNeeded, NoMatch, RecommendationResponse, RecommendationSet
 from app.validation import RecommendationChoice, build_points, validate_choice
 
@@ -32,6 +44,7 @@ log = logging.getLogger(__name__)
 MAX_CANDIDATES_FOR_MODEL = 6
 MAX_EXCERPTS = 5
 EXCERPT_CHARS = 300
+MAX_ATTEMPTS_PER_HOUR = 20  # per user; each attempt costs AI calls
 
 WEAK_MATCH_QUESTION = (
     "I couldn't find a clear match yet. Could you describe the symptom in a bit more detail, "
@@ -46,6 +59,11 @@ FAILED = ApiError(
     "recommendation_failed",
     "Something went wrong while preparing your recommendations. Please try again.",
     retryable=True,
+)
+RATE_LIMITED = ApiError(
+    429,
+    "rate_limited",
+    "You've asked for a lot of recommendations in a short time. Please try again later.",
 )
 NOT_FOUND = ApiError(404, "not_found", "We couldn't find that request. Please start again.")
 
@@ -82,46 +100,65 @@ def build_prompt(
         }
         for c in retrieval.chunks[:MAX_EXCERPTS]
     ]
-    prompt = f"<symptom>{symptom}</symptom>"
+    prompt = f"<symptom>{escape_tags(symptom)}</symptom>"
     if clarification:
-        prompt += f"\nClarifying question: {clarification[0]}\n<answer>{clarification[1]}</answer>"
+        question, answer = clarification
+        prompt += f"\nClarifying question: {question}\n<answer>{escape_tags(answer)}</answer>"
     prompt += f"\n\nCandidates (best first): {json.dumps(candidates)}"
     prompt += f"\n\nKnowledge excerpts: {json.dumps(excerpts)}"
     return prompt
 
 
+def update_attempt(conn: psycopg.Connection, attempt_id: uuid.UUID, **fields: object) -> None:
+    assignments = ", ".join(f"{name} = %({name})s" for name in fields)
+    conn.execute(
+        f"update recommendation_attempts set {assignments}, updated_at = now() where id = %(id)s",
+        {**fields, "id": attempt_id},
+    )
+
+
 class Recommender:
-    def __init__(self, conn: psycopg.Connection, ai: AI) -> None:
-        self.conn = conn
+    def __init__(self, connect: Connect, ai: AI) -> None:
+        self.connect = connect
         self.ai = ai
 
     # --- Public entry points --------------------------------------------------------
 
     def start(self, user_id: uuid.UUID, symptom: str) -> RecommendationResponse:
-        row = self.conn.execute(
-            "insert into recommendation_attempts (user_id, symptom_text) "
-            "values (%s, %s) returning id",
-            (user_id, symptom),
-        ).fetchone()
+        with self.connect() as conn:
+            recent = conn.execute(
+                "select count(*) from recommendation_attempts "
+                "where user_id = %s and created_at > now() - interval '1 hour'",
+                (user_id,),
+            ).fetchone()
+            assert recent is not None
+            if recent[0] >= MAX_ATTEMPTS_PER_HOUR:
+                raise RATE_LIMITED
+            row = conn.execute(
+                "insert into recommendation_attempts (user_id, symptom_text) "
+                "values (%s, %s) returning id",
+                (user_id, symptom),
+            ).fetchone()
         assert row is not None
         attempt_id: uuid.UUID = row[0]
-        self.conn.commit()
         return self._run(user_id, attempt_id, symptom, clarification=None)
 
     def clarify(
         self, user_id: uuid.UUID, attempt_id: uuid.UUID, answer: str
     ) -> RecommendationResponse:
-        row = self.conn.execute(
-            "select symptom_text, clarification_question from recommendation_attempts "
-            "where id = %s and user_id = %s and clarification_question is not null "
-            "and outcome in ('clarification_needed', 'failed')",
-            (attempt_id, user_id),
-        ).fetchone()
+        # Claim the attempt in one statement: of two concurrent answers only one gets a row.
+        with self.connect() as conn:
+            row = conn.execute(
+                "update recommendation_attempts set outcome = 'pending', "
+                "clarification_answer = %s, updated_at = now() "
+                "where id = %s and user_id = %s and clarification_question is not null "
+                "and outcome in ('clarification_needed', 'failed') "
+                "returning symptom_text, clarification_question",
+                (answer, attempt_id, user_id),
+            ).fetchone()
         if row is None:
             raise NOT_FOUND
         symptom, question = row
-        self._update(attempt_id, clarification_answer=answer)
-        self.conn.commit()
         return self._run(user_id, attempt_id, symptom, clarification=(question, answer))
 
     # --- Workflow -----------------------------------------------------------------
@@ -151,18 +188,24 @@ class Recommender:
         symptom: str,
         clarification: tuple[str, str] | None,
     ) -> RecommendationResponse:
-        interpretation = interpret(self.ai, symptom, load_categories(self.conn), clarification)
+        with self.connect() as conn:
+            categories = load_categories(conn)
+        interpretation = interpret(self.ai, symptom, categories, clarification)
+        # Saved on its own, to keep the matching result even if a later step fails.
         self._update(attempt_id, category_ids=interpretation.category_ids)
-        self.conn.commit()  # keep the matching result even if a later step fails
 
         if interpretation.needs_clarification:
             return self._ask(attempt_id, interpretation.clarification_question or DEFAULT_QUESTION)
 
-        retrieval = retrieve(self.conn, self.ai, interpretation)
+        embedding = embed_query(self.ai, interpretation)
+        with self.connect() as conn:
+            retrieval = retrieve(conn, embedding, interpretation)
+            ranked = (
+                self._rank(conn, user_id, retrieval, interpretation) if retrieval.sufficient else []
+            )
         if not retrieval.sufficient:
             return self._weak_match(attempt_id, clarification)
 
-        ranked = self._rank(user_id, retrieval, interpretation)
         choice = self.ai.generate(
             SYSTEM_PROMPT,
             build_prompt(symptom, clarification, retrieval, ranked),
@@ -171,23 +214,27 @@ class Recommender:
         if not choice.enough_relevant:
             return self._weak_match(attempt_id, clarification)
 
-        records = validate_choice(self.conn, choice, set(ranked))
-        points = build_points(records, get_settings().supabase_public_url)
-        for point in points:
-            self.conn.execute(
-                "insert into recommendation_points (attempt_id, point_id, rank) "
-                "values (%s, %s, %s)",
-                (attempt_id, point.point_id, point.rank),
-            )
-        self._update(attempt_id, outcome="recommended")
-        self.conn.commit()
+        with self.connect() as conn:
+            records = validate_choice(conn, choice, set(ranked))
+            points = build_points(records, get_settings().supabase_public_url)
+            for point in points:
+                conn.execute(
+                    "insert into recommendation_points (attempt_id, point_id, rank) "
+                    "values (%s, %s, %s)",
+                    (attempt_id, point.point_id, point.rank),
+                )
+            update_attempt(conn, attempt_id, outcome="recommended")
         return RecommendationSet(attempt_id=attempt_id, points=points)
 
     def _rank(
-        self, user_id: uuid.UUID, retrieval: RetrievalResult, interpretation: Interpretation
+        self,
+        conn: psycopg.Connection,
+        user_id: uuid.UUID,
+        retrieval: RetrievalResult,
+        interpretation: Interpretation,
     ) -> list[str]:
         ids = [c.point.id for c in retrieval.candidates]
-        signals = load_rating_signals(self.conn, user_id, ids, interpretation.category_ids)
+        signals = load_rating_signals(conn, user_id, ids, interpretation.category_ids)
         return [c.point.id for c in rank(retrieval.candidates, signals)][:MAX_CANDIDATES_FOR_MODEL]
 
     def _weak_match(
@@ -196,25 +243,17 @@ class Recommender:
         if clarification is None:
             return self._ask(attempt_id, WEAK_MATCH_QUESTION)
         self._update(attempt_id, outcome="no_match")
-        self.conn.commit()
         return NoMatch(attempt_id=attempt_id, message=NO_MATCH_MESSAGE)
 
     def _ask(self, attempt_id: uuid.UUID, question: str) -> RecommendationResponse:
         self._update(attempt_id, outcome="clarification_needed", clarification_question=question)
-        self.conn.commit()
         return ClarificationNeeded(attempt_id=attempt_id, question=question)
 
     def _fail(self, attempt_id: uuid.UUID, exc: Exception) -> None:
         # Log the error class and attempt id only: no symptom text, prompts or provider details.
         log.error("attempt %s failed: %s", attempt_id, type(exc).__name__)
-        self.conn.rollback()
         self._update(attempt_id, outcome="failed")
-        self.conn.commit()
 
     def _update(self, attempt_id: uuid.UUID, **fields: object) -> None:
-        assignments = ", ".join(f"{name} = %({name})s" for name in fields)
-        self.conn.execute(
-            f"update recommendation_attempts set {assignments}, updated_at = now() "
-            "where id = %(id)s",
-            {**fields, "id": attempt_id},
-        )
+        with self.connect() as conn:
+            update_attempt(conn, attempt_id, **fields)

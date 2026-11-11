@@ -221,6 +221,7 @@ meine-tcm.com gave permission (November 2026) to use its text and point pictures
 
 - **One error shape.** Every API error looks like `{"error": {"code", "message", "retryable"}}`, with a generic message that's safe to show. Stack traces, provider errors, prompts and request IDs never appear in responses.
 - **Failures are retryable and recorded.** AI or technical failures return `502 recommendation_failed` with `retryable: true`, and the attempt is stored as `failed`.
+- **Recommendations are rate limited.** A user can start 20 recommendation attempts per hour (`MAX_ATTEMPTS_PER_HOUR` in `backend/app/recommender.py`); beyond that the API returns `429 rate_limited`.
 - **Logs** record attempt IDs, outcomes and error classes. Symptom text is never logged. Unexpected exceptions are logged with their class and stack frames but not their message, because messages can echo stored values.
 - **Secrets stay off the frontend.** AI provider keys and the Supabase service-role key exist only on the backend.
 
