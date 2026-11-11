@@ -3,13 +3,18 @@ import pytest
 
 from app.ai import FakeAI
 from app.interpretation import Interpretation
-from app.retrieval import retrieve
+from app.retrieval import RetrievalResult, embed_query
+from app.retrieval import retrieve as retrieve_with_embedding
 
 AI = FakeAI()
 
 
 def interpretation(categories: list[str], terms: list[str]) -> Interpretation:
     return Interpretation(category_ids=categories, search_terms=terms, needs_clarification=False)
+
+
+def retrieve(conn: psycopg.Connection, ai: FakeAI, interp: Interpretation) -> RetrievalResult:
+    return retrieve_with_embedding(conn, embed_query(ai, interp), interp)
 
 
 @pytest.fixture
@@ -82,3 +87,28 @@ def test_weak_matches_are_insufficient_not_padded(kb: psycopg.Connection) -> Non
 def test_no_categories_and_no_similar_text_finds_nothing_relevant(kb: psycopg.Connection) -> None:
     result = retrieve(kb, AI, interpretation([], ["qwertyuiop asdfgh"]))
     assert not any(c.point.id.startswith("RT") for c in result.candidates)
+
+
+def test_equally_relevant_category_points_are_ordered_by_similarity(kb: psycopg.Connection) -> None:
+    source_id = kb.execute("select id from sources where title = 'Retrieval test source'")
+    kb.execute(
+        "insert into knowledge_chunks (source_id, point_id, page, content, embedding) "
+        "values (%s, 'RT3', 8, %s, %s::extensions.vector)",
+        (source_id.fetchone()[0], "flumph wibble", str(AI.embed("flumph wibble"))),  # type: ignore[index]
+    )
+    # Push RT3's chunk out of the top chunks, so it only counts as a category match.
+    for n in range(10):
+        text = f"flumph wibble grobnar {n}"
+        kb.execute(
+            "insert into knowledge_chunks (source_id, point_id, page, content, embedding) "
+            "select id, null, 9, %s, %s::extensions.vector from sources "
+            "where title = 'Retrieval test source'",
+            (text, str(AI.embed("flumph wibble grobnar"))),
+        )
+
+    result = retrieve(kb, AI, interpretation(["rt-cat-a"], ["flumph wibble grobnar"]))
+
+    by_id = {c.point.id: c for c in result.candidates}
+    assert by_id["RT1"].relevance == by_id["RT2"].relevance == by_id["RT3"].relevance == 1.0
+    assert by_id["RT3"].similarity > 0.5 and by_id["RT1"].similarity == 0.0
+    assert [c.point.id for c in result.candidates][:3] == ["RT3", "RT1", "RT2"]
