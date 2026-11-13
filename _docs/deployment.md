@@ -24,6 +24,8 @@ Everything is defined in `render.yaml` (Render Blueprint) and two workflows:
 
 ## One-time setup
 
+For the full sequence including local tools, the `gh` CLI and Claude Code, see [`setup-guide.md`](setup-guide.md).
+
 Do these steps in order. Keep secret values out of chat and commits: paste them only into the AWS, Supabase, Render and GitHub dashboards, or into `gh secret set`.
 
 ### 1. AI provider keys
@@ -71,12 +73,14 @@ The AWS account has no Bedrock token quota, so the app uses Claude on the Anthro
 ### 4. GitHub
 
 1. **Environments.** Under *Settings → Environments*, create `development` and `production`. For `production`, add yourself as a **required reviewer**; that gives the manual approval step.
-2. **Secrets.** Add the repository secrets (you'll be prompted for each value):
+2. **Secrets.** Add the environment secrets (you'll be prompted for each value; `RENDER_API_KEY` goes into both environments):
 
    ```sh
-   for s in RENDER_API_KEY RENDER_DEV_API_SERVICE_ID RENDER_DEV_WEB_SERVICE_ID \
-            RENDER_PROD_API_SERVICE_ID RENDER_PROD_WEB_SERVICE_ID DEV_DATABASE_URL PROD_DATABASE_URL; do
-     gh secret set "$s"
+   for s in RENDER_API_KEY RENDER_DEV_API_SERVICE_ID RENDER_DEV_WEB_SERVICE_ID DEV_DATABASE_URL; do
+     gh secret set "$s" --env development
+   done
+   for s in RENDER_API_KEY RENDER_PROD_API_SERVICE_ID RENDER_PROD_WEB_SERVICE_ID PROD_DATABASE_URL; do
+     gh secret set "$s" --env production
    done
    ```
 
